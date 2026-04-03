@@ -11,7 +11,13 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Menu,
-  X
+  X,
+  MapPin,
+  Shield,
+  BarChart3,
+  Calendar,
+  FileCheck,
+  TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -26,6 +32,12 @@ const navigation = [
   { name: 'Maintenance', href: '/maintenance', icon: Wrench },
   { name: 'Repairs', href: '/repairs', icon: Hammer },
   { name: 'Incidents', href: '/incidents', icon: AlertTriangle },
+  { name: 'Real-Time Tracking', href: '/tracking', icon: MapPin },
+  { name: 'Driver Behavior', href: '/driver-behavior', icon: Shield },
+  { name: 'Fuel Management', href: '/fuel-management', icon: Fuel },
+  { name: 'Maintenance Scheduling', href: '/maintenance-scheduling', icon: Calendar },
+  { name: 'Compliance', href: '/compliance', icon: FileCheck },
+  { name: 'Asset Utilization', href: '/utilization', icon: TrendingUp },
   { name: 'Settings', href: '/settings', icon: SettingsIcon },
 ];
 

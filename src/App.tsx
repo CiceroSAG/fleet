@@ -18,6 +18,12 @@ import Repairs from './pages/Repairs';
 import Incidents from './pages/Incidents';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import RealTimeTracking from './pages/RealTimeTracking';
+import DriverBehavior from './pages/DriverBehavior';
+import FuelManagement from './pages/FuelManagement';
+import MaintenanceScheduling from './pages/MaintenanceScheduling';
+import ComplianceManagement from './pages/ComplianceManagement';
+import AssetUtilization from './pages/AssetUtilization';
 
 const queryClient = new QueryClient();
 
@@ -55,8 +61,12 @@ export default function App() {
               <Route path="maintenance" element={<Maintenance />} />
               <Route path="repairs" element={<Repairs />} />
               <Route path="incidents" element={<Incidents />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
+              <Route path="settings" element={<Settings />} />            <Route path="tracking" element={<RealTimeTracking />} />
+            <Route path="driver-behavior" element={<DriverBehavior />} />
+            <Route path="fuel-management" element={<FuelManagement />} />
+            <Route path="maintenance-scheduling" element={<MaintenanceScheduling />} />
+            <Route path="compliance" element={<ComplianceManagement />} />
+            <Route path="utilization" element={<AssetUtilization />} />            </Route>
           </Routes>
         </BrowserRouter>
       </AuthProvider>

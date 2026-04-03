@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getDashboardStats, getSettings } from '@/lib/api';
-import { Tractor, AlertTriangle, Fuel, Activity } from 'lucide-react';
+import { Tractor, AlertTriangle, Fuel, Activity, MapPin, Shield, BarChart3, Calendar, FileCheck, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { getCurrencySymbol } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
 const COLORS = ['#22c55e', '#eab308', '#9ca3af', '#ef4444']; // Active, Maintenance, Out of Service, Damaged
 
@@ -234,6 +235,83 @@ export default function Dashboard() {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced Fleet Management Features */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-medium leading-6 text-gray-900">Advanced Fleet Management</h3>
+          <p className="mt-1 text-sm text-gray-500">Access comprehensive fleet management tools</p>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Link
+              to="/tracking"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <MapPin className="h-8 w-8 text-blue-600 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">Real-Time Tracking</h4>
+                <p className="text-sm text-gray-500">GPS tracking and telematics</p>
+              </div>
+            </Link>
+
+            <Link
+              to="/driver-behavior"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Shield className="h-8 w-8 text-green-600 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">Driver Behavior</h4>
+                <p className="text-sm text-gray-500">Safety monitoring and coaching</p>
+              </div>
+            </Link>
+
+            <Link
+              to="/fuel-management"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Fuel className="h-8 w-8 text-orange-600 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">Fuel Management</h4>
+                <p className="text-sm text-gray-500">Optimization and efficiency tracking</p>
+              </div>
+            </Link>
+
+            <Link
+              to="/maintenance-scheduling"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Calendar className="h-8 w-8 text-purple-600 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">Maintenance Scheduling</h4>
+                <p className="text-sm text-gray-500">Automated scheduling and tracking</p>
+              </div>
+            </Link>
+
+            <Link
+              to="/compliance"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <FileCheck className="h-8 w-8 text-indigo-600 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">Compliance Management</h4>
+                <p className="text-sm text-gray-500">HoS and DVIR reporting</p>
+              </div>
+            </Link>
+
+            <Link
+              to="/utilization"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <TrendingUp className="h-8 w-8 text-teal-600 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">Asset Utilization</h4>
+                <p className="text-sm text-gray-500">Performance and efficiency reports</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
