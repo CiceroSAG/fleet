@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getFuelLogs, deleteFuelLog, getSettings } from '@/lib/api';
-import { Plus, Search, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Filter, Fuel, DollarSign, TrendingUp, Calendar } from 'lucide-react';
 import FuelLogForm from '@/components/FuelLogForm';
 import { useAuth } from '@/lib/auth';
 import { getCurrencySymbol } from '@/lib/utils';
@@ -10,6 +10,8 @@ export default function FuelLogs() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [equipmentFilter, setEquipmentFilter] = useState('all');
   
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -51,10 +53,39 @@ export default function FuelLogs() {
     setIsFormOpen(false);
   };
 
-  const filteredLogs = logs?.filter((item: any) => 
-    item.equipment?.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.equipment?.type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLogs = logs?.filter((item: any) => {
+    const matchesSearch = item.equipment?.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.equipment?.type.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesDate = !dateFilter || item.date.startsWith(dateFilter);
+    const matchesEquipment = equipmentFilter === 'all' || item.equipment_id === equipmentFilter;
+    
+    return matchesSearch && matchesDate && matchesEquipment;
+  });
+
+  // Calculate summary statistics
+  const stats = React.useMemo(() => {
+    if (!filteredLogs) return { total: 0, totalQuantity: 0, totalCost: 0, avgPrice: 0 };
+    
+    const total = filteredLogs.length;
+    const totalQuantity = filteredLogs.reduce((sum, log) => sum + Number(log.quantity), 0);
+    const totalCost = filteredLogs.reduce((sum, log) => sum + Number(log.cost), 0);
+    const avgPrice = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+    
+    return { total, totalQuantity, totalCost, avgPrice };
+  }, [filteredLogs]);
+
+  // Get unique equipment for filter dropdown
+  const equipmentOptions = React.useMemo(() => {
+    if (!logs) return [];
+    const unique = new Map();
+    logs.forEach((log: any) => {
+      if (log.equipment && !unique.has(log.equipment.id)) {
+        unique.set(log.equipment.id, log.equipment);
+      }
+    });
+    return Array.from(unique.values());
+  }, [logs]);
 
   return (
     <div>
@@ -77,19 +108,86 @@ export default function FuelLogs() {
         </div>
       </div>
 
-      <div className="bg-white shadow-sm ring-1 ring-gray-300 sm:rounded-lg">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <div className="relative rounded-md shadow-sm max-w-sm w-full">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <Fuel className="h-8 w-8 text-blue-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Logs</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
-              placeholder="Search by asset tag..."
-            />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <TrendingUp className="h-8 w-8 text-green-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Fuel</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalQuantity.toFixed(1)} L</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <DollarSign className="h-8 w-8 text-orange-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Cost</p>
+              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{stats.totalCost.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <Calendar className="h-8 w-8 text-purple-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Avg Price/L</p>
+              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{stats.avgPrice.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white shadow-sm ring-1 ring-gray-300 sm:rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="relative rounded-md shadow-sm max-w-sm w-full">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
+                placeholder="Search by asset tag..."
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <Filter className="h-5 w-5 text-gray-400" />
+              <input
+                type="month"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
+              />
+              <select
+                value={equipmentFilter}
+                onChange={(e) => setEquipmentFilter(e.target.value)}
+                className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
+              >
+                <option value="all">All Equipment</option>
+                {equipmentOptions.map((eq: any) => (
+                  <option key={eq.id} value={eq.id}>
+                    {eq.asset_tag} ({eq.type})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         

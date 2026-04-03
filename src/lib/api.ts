@@ -84,12 +84,40 @@ export async function createEquipment(equipment: any) {
 }
 
 export async function updateEquipment(id: string, equipment: any) {
+  const { data: oldEquipment, error: fetchError } = await supabase
+    .from('equipment')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
   const { data, error } = await supabase
     .from('equipment')
     .update(equipment)
     .eq('id', id)
     .select();
   if (error) throw error;
+
+  // If status changed to "Under Maintenance", create a maintenance log
+  if (oldEquipment.status !== 'Under Maintenance' && equipment.status === 'Under Maintenance') {
+    try {
+      await createMaintenanceLog({
+        equipment_id: id,
+        date: new Date().toISOString().split('T')[0],
+        maintenance_type: 'corrective',
+        description: 'Equipment status changed to Under Maintenance',
+        hours_worked: 0,
+        cost: 0,
+        performed_by: null, // Will be set by current user if available
+        notes: 'Automatic log created when equipment status changed to Under Maintenance'
+      });
+    } catch (logError) {
+      console.error('Error creating maintenance log for status change:', logError);
+      // Don't throw error as the equipment update was successful
+    }
+  }
+
   return data[0];
 }
 
@@ -1302,5 +1330,38 @@ export async function getEquipmentUnderMaintenance() {
     .order('asset_tag');
   if (error) throw error;
   return data;
+}
+
+export async function getMaintenanceSchedulesWithUnderMaintenance() {
+  // Get both scheduled maintenance and equipment under maintenance
+  const [schedules, underMaintenance] = await Promise.all([
+    getMaintenanceSchedules(),
+    getEquipmentUnderMaintenance()
+  ]);
+
+  // Convert equipment under maintenance to schedule-like format
+  const underMaintenanceSchedules = underMaintenance.map(equipment => ({
+    id: `under-maintenance-${equipment.id}`,
+    equipment_id: equipment.id,
+    maintenance_type: 'corrective',
+    description: 'Currently Under Maintenance',
+    interval_type: 'manual',
+    interval_value: 0,
+    last_performed: null,
+    next_due: new Date().toISOString(), // Due now
+    priority: 'high',
+    status: 'in_progress',
+    assigned_to: null,
+    estimated_cost: 0,
+    notes: 'Equipment is currently under maintenance',
+    equipment: {
+      asset_tag: equipment.asset_tag,
+      type: equipment.type
+    },
+    profiles: null,
+    isUnderMaintenance: true
+  }));
+
+  return [...schedules, ...underMaintenanceSchedules];
 }
 

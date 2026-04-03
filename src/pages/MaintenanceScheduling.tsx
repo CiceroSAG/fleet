@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getMaintenanceSchedulesWithUnderMaintenance } from '@/lib/api';
 import { Wrench, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface MaintenanceSchedule {
@@ -40,36 +40,24 @@ export default function MaintenanceScheduling() {
 
   const fetchMaintenanceSchedules = async () => {
     try {
-      let query = supabase
-        .from('maintenance_schedules')
-        .select(`
-          *,
-          equipment:equipment_id (
-            asset_tag,
-            type
-          ),
-          profiles:assigned_to (
-            email
-          )
-        `)
-        .order('next_due', { ascending: true });
+      const data = await getMaintenanceSchedulesWithUnderMaintenance();
+
+      // Apply filters
+      let filteredData = data;
 
       if (filter.status !== 'all') {
-        query = query.eq('status', filter.status);
+        filteredData = filteredData.filter(s => s.status === filter.status);
       }
 
       if (filter.priority !== 'all') {
-        query = query.eq('priority', filter.priority);
+        filteredData = filteredData.filter(s => s.priority === filter.priority);
       }
 
       if (filter.type !== 'all') {
-        query = query.eq('maintenance_type', filter.type);
+        filteredData = filteredData.filter(s => s.maintenance_type === filter.type);
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setSchedules(data || []);
+      setSchedules(filteredData);
     } catch (error) {
       console.error('Error fetching maintenance schedules:', error);
     } finally {
@@ -79,15 +67,31 @@ export default function MaintenanceScheduling() {
 
   const updateScheduleStatus = async (id: string, status: string) => {
     try {
-      const { error } = await supabase
-        .from('maintenance_schedules')
-        .update({
-          status,
-          ...(status === 'completed' ? { last_performed: new Date().toISOString() } : {})
-        })
-        .eq('id', id);
+      // Handle equipment under maintenance (they have special IDs)
+      if (id.startsWith('under-maintenance-')) {
+        const equipmentId = id.replace('under-maintenance-', '');
+        // When marking "under maintenance" as completed, change equipment status back to Active
+        if (status === 'completed') {
+          const { error } = await supabase
+            .from('equipment')
+            .update({ status: 'Active' })
+            .eq('id', equipmentId);
 
-      if (error) throw error;
+          if (error) throw error;
+        }
+      } else {
+        // Regular maintenance schedule
+        const { error } = await supabase
+          .from('maintenance_schedules')
+          .update({
+            status,
+            ...(status === 'completed' ? { last_performed: new Date().toISOString() } : {})
+          })
+          .eq('id', id);
+
+        if (error) throw error;
+      }
+
       fetchMaintenanceSchedules();
     } catch (error) {
       console.error('Error updating schedule:', error);
@@ -99,6 +103,7 @@ export default function MaintenanceScheduling() {
       case 'completed': return 'text-green-600 bg-green-100';
       case 'overdue': return 'text-red-600 bg-red-100';
       case 'active': return 'text-blue-600 bg-blue-100';
+      case 'in_progress': return 'text-yellow-600 bg-yellow-100';
       case 'cancelled': return 'text-gray-600 bg-gray-100';
       default: return 'text-gray-600 bg-gray-100';
     }
@@ -218,6 +223,7 @@ export default function MaintenanceScheduling() {
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
+              <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="overdue">Overdue</option>
               <option value="cancelled">Cancelled</option>

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMaintenanceLogs, deleteMaintenanceLog, getSettings, getEquipmentUnderMaintenance } from '@/lib/api';
-import { Plus, Search, Edit2, Trash2, Wrench } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Wrench, Filter, Calendar, DollarSign, Clock } from 'lucide-react';
 import MaintenanceForm from '@/components/MaintenanceForm';
 import { useAuth } from '@/lib/auth';
 import { getCurrencySymbol } from '@/lib/utils';
@@ -11,6 +11,8 @@ export default function Maintenance() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -56,10 +58,32 @@ export default function Maintenance() {
     setIsFormOpen(false);
   };
 
-  const filteredLogs = logs?.filter((item: any) => 
-    item.equipment?.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.service_type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLogs = logs?.filter((item: any) => {
+    const matchesSearch = item.equipment?.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.service_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesDate = !dateFilter || item.date.startsWith(dateFilter);
+    const matchesType = typeFilter === 'all' || item.service_type === typeFilter;
+    
+    return matchesSearch && matchesDate && matchesType;
+  });
+
+  // Calculate summary statistics
+  const stats = React.useMemo(() => {
+    if (!filteredLogs) return { total: 0, totalCost: 0, thisMonth: 0, avgCost: 0 };
+    
+    const total = filteredLogs.length;
+    const totalCost = filteredLogs.reduce((sum, log) => sum + Number(log.cost), 0);
+    const thisMonth = filteredLogs.filter(log => {
+      const logDate = new Date(log.date);
+      const now = new Date();
+      return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
+    }).length;
+    const avgCost = total > 0 ? totalCost / total : 0;
+    
+    return { total, totalCost, thisMonth, avgCost };
+  }, [filteredLogs]);
 
   return (
     <div>
@@ -105,19 +129,84 @@ export default function Maintenance() {
         </div>
       )}
 
-      <div className="bg-white shadow-sm ring-1 ring-gray-300 sm:rounded-lg">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <div className="relative rounded-md shadow-sm max-w-sm w-full">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <Wrench className="h-8 w-8 text-blue-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Logs</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
-              placeholder="Search by asset tag or type..."
-            />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <DollarSign className="h-8 w-8 text-green-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Cost</p>
+              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{stats.totalCost.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <Calendar className="h-8 w-8 text-orange-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">This Month</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.thisMonth}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <Clock className="h-8 w-8 text-purple-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Avg Cost</p>
+              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{stats.avgCost.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white shadow-sm ring-1 ring-gray-300 sm:rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="relative rounded-md shadow-sm max-w-sm w-full">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
+                placeholder="Search by asset tag, type, or notes..."
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <Filter className="h-5 w-5 text-gray-400" />
+              <input
+                type="month"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
+              />
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
+              >
+                <option value="all">All Types</option>
+                <option value="routine">Routine</option>
+                <option value="major">Major</option>
+                <option value="emergency">Emergency</option>
+              </select>
+            </div>
           </div>
         </div>
         

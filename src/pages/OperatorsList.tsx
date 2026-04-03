@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getOperators, deleteOperator } from '@/lib/api';
-import { Plus, Search, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Users, UserCheck, Clock, AlertTriangle } from 'lucide-react';
 import OperatorForm from '@/components/OperatorForm';
 import { useAuth } from '@/lib/auth';
 
@@ -9,6 +9,7 @@ export default function OperatorsList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOperator, setEditingOperator] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -42,10 +43,28 @@ export default function OperatorsList() {
     setIsFormOpen(false);
   };
 
-  const filteredOperators = operators?.filter((item: any) => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.license_type?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOperators = operators?.filter((item: any) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.license_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && item.is_active) || 
+      (statusFilter === 'inactive' && !item.is_active);
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Calculate summary statistics
+  const stats = React.useMemo(() => {
+    if (!operators) return { total: 0, active: 0, withLicense: 0 };
+    
+    const total = operators.length;
+    const active = operators.filter(op => op.is_active).length;
+    const withLicense = operators.filter(op => op.license_number).length;
+    
+    return { total, active, withLicense };
+  }, [operators]);
 
   return (
     <div>
@@ -70,19 +89,66 @@ export default function OperatorsList() {
         )}
       </div>
 
-      <div className="bg-white shadow-sm ring-1 ring-gray-300 sm:rounded-lg">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <div className="relative rounded-md shadow-sm max-w-sm w-full">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <Users className="h-8 w-8 text-blue-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Operators</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
-              placeholder="Search operators..."
-            />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <UserCheck className="h-8 w-8 text-green-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Active</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center">
+            <AlertTriangle className="h-8 w-8 text-orange-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">With License</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.withLicense}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white shadow-sm ring-1 ring-gray-300 sm:rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="relative rounded-md shadow-sm max-w-sm w-full">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
+                placeholder="Search operators..."
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
         </div>
         

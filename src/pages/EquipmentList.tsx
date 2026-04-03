@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getEquipment, deleteEquipment } from '@/lib/api';
-import { Plus, Search, Edit2, Trash2, Filter } from 'lucide-react';
+import { getEquipment, deleteEquipment, updateEquipment } from '@/lib/api';
+import { Plus, Search, Edit2, Trash2, Filter, MoreVertical, CheckCircle, Wrench, AlertTriangle, XCircle } from 'lucide-react';
 import EquipmentForm from '@/components/EquipmentForm';
 import { useAuth } from '@/lib/auth';
 import { Link } from 'react-router-dom';
@@ -21,12 +21,17 @@ export default function EquipmentList() {
     queryFn: getEquipment
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteEquipment,
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => 
+      updateEquipment(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
     }
   });
+
+  const handleStatusChange = (id: string, status: string) => {
+    updateStatusMutation.mutate({ id, status });
+  };
 
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this equipment?')) {
@@ -128,6 +133,7 @@ export default function EquipmentList() {
                   <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">License Plate</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Quick Actions</th>
                   {canEdit && (
                     <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                       <span className="sr-only">Actions</span>
@@ -156,6 +162,37 @@ export default function EquipmentList() {
                       }`}>
                         {item.status}
                       </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      <div className="flex space-x-1">
+                        {item.status !== 'Active' && (
+                          <button
+                            onClick={() => handleStatusChange(item.id, 'Active')}
+                            className="text-green-600 hover:text-green-900 p-1 rounded"
+                            title="Mark as Active"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </button>
+                        )}
+                        {item.status !== 'Under Maintenance' && (
+                          <button
+                            onClick={() => handleStatusChange(item.id, 'Under Maintenance')}
+                            className="text-yellow-600 hover:text-yellow-900 p-1 rounded"
+                            title="Mark as Under Maintenance"
+                          >
+                            <Wrench className="h-4 w-4" />
+                          </button>
+                        )}
+                        {item.status !== 'Out of Service' && (
+                          <button
+                            onClick={() => handleStatusChange(item.id, 'Out of Service')}
+                            className="text-gray-600 hover:text-gray-900 p-1 rounded"
+                            title="Mark as Out of Service"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     {canEdit && (
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
