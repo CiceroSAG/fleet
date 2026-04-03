@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { AlertTriangle, TrendingUp, Users, Clock } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Users, Clock, Plus } from 'lucide-react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { createDriverBehaviorEvent, checkDriverBehaviorForHOSViolations, getOperators, getEquipment } from '@/lib/api';
 
 interface DriverBehaviorEvent {
   id: string;
@@ -28,10 +30,22 @@ export default function DriverBehavior() {
     severity: 'all',
     dateRange: '7' // days
   });
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
-  useEffect(() => {
-    fetchDriverBehaviorEvents();
-  }, [filter]);
+  const queryClient = useQueryClient();
+  const { data: operators } = useQuery({ queryKey: ['operators'], queryFn: getOperators });
+  const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
+
+  const createEventMutation = useMutation({
+    mutationFn: createDriverBehaviorEvent,
+    onSuccess: async (newEvent) => {
+      // Check for HOS violations
+      await checkDriverBehaviorForHOSViolations(newEvent.operator_id, newEvent.event_type, newEvent.severity);
+      queryClient.invalidateQueries({ queryKey: ['driverBehaviorEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['hoursOfService'] });
+      setShowCreateForm(false);
+    }
+  });
 
   const fetchDriverBehaviorEvents = async () => {
     try {
@@ -148,12 +162,21 @@ export default function DriverBehavior() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Driver Behavior & Safety</h1>
-        <button
-          onClick={fetchDriverBehaviorEvents}
-          className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700"
-        >
-          Refresh Data
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Test Event
+          </button>
+          <button
+            onClick={fetchDriverBehaviorEvents}
+            className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700"
+          >
+            Refresh Data
+          </button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -294,6 +317,124 @@ export default function DriverBehavior() {
           </div>
         </div>
       </div>
+
+      {/* Create Event Modal */}
+      {showCreateForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-black/50 p-4">
+          <div className="relative w-full max-w-md rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b p-4">
+              <h3 className="text-xl font-semibold text-gray-900">Create Test Safety Event</h3>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                className="ml-auto inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-gray-400 hover:bg-gray-200 hover:text-gray-900"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const eventData = {
+                equipment_id: formData.get('equipment_id'),
+                operator_id: formData.get('operator_id'),
+                event_type: formData.get('event_type'),
+                severity: formData.get('severity'),
+                value: parseFloat(formData.get('value') as string),
+                location_lat: 40.7128 + (Math.random() - 0.5) * 0.1, // Random NYC area
+                location_lng: -74.0060 + (Math.random() - 0.5) * 0.1,
+                timestamp: new Date().toISOString()
+              };
+              createEventMutation.mutate(eventData);
+            }} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Equipment</label>
+                <select
+                  name="equipment_id"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
+                >
+                  <option value="">Select Equipment</option>
+                  {equipment?.map((eq: any) => (
+                    <option key={eq.id} value={eq.id}>{eq.asset_tag} - {eq.type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Operator</label>
+                <select
+                  name="operator_id"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
+                >
+                  <option value="">Select Operator</option>
+                  {operators?.map((op: any) => (
+                    <option key={op.id} value={op.id}>{op.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Event Type</label>
+                <select
+                  name="event_type"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
+                >
+                  <option value="speeding">Speeding</option>
+                  <option value="harsh_braking">Harsh Braking</option>
+                  <option value="rapid_acceleration">Rapid Acceleration</option>
+                  <option value="harsh_cornering">Harsh Cornering</option>
+                  <option value="idling">Excessive Idling</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Severity</label>
+                <select
+                  name="severity"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Value</label>
+                <input
+                  type="number"
+                  name="value"
+                  step="0.1"
+                  required
+                  placeholder="e.g., 15 (mph over limit)"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createEventMutation.isPending}
+                  className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {createEventMutation.isPending ? 'Creating...' : 'Create Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

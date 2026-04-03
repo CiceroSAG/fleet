@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { createFuelLog, updateFuelLog, getEquipment, getSettings } from '@/lib/api';
+import { createFuelLog, updateFuelLog, getEquipment, getSettings, calculateFuelEfficiencyFromFuelLog } from '@/lib/api';
 import { X } from 'lucide-react';
 import { getCurrencySymbol } from '@/lib/utils';
 
@@ -41,16 +41,22 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
 
   const createMutation = useMutation({
     mutationFn: createFuelLog,
-    onSuccess: () => {
+    onSuccess: async (newLog) => {
       queryClient.invalidateQueries({ queryKey: ['fuelLogs'] });
+      // Calculate fuel efficiency metrics
+      await calculateFuelEfficiencyFromFuelLog(newLog.id);
+      queryClient.invalidateQueries({ queryKey: ['fuelEfficiencyMetrics'] });
       onClose();
     }
   });
 
   const updateMutation = useMutation({
     mutationFn: (data: FuelLogFormData) => updateFuelLog(log.id, data),
-    onSuccess: () => {
+    onSuccess: async (updatedLog) => {
       queryClient.invalidateQueries({ queryKey: ['fuelLogs'] });
+      // Recalculate fuel efficiency metrics
+      await calculateFuelEfficiencyFromFuelLog(updatedLog.id);
+      queryClient.invalidateQueries({ queryKey: ['fuelEfficiencyMetrics'] });
       onClose();
     }
   });

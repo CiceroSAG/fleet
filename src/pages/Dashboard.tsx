@@ -47,8 +47,10 @@ export default function Dashboard() {
   const cards = [
     { name: 'Total Equipment', value: stats.totalEquipment, icon: Tractor, color: 'bg-blue-500' },
     { name: 'Active Machines', value: stats.activeEquipment, icon: Activity, color: 'bg-green-500' },
-    { name: 'Under Maintenance', value: stats.maintenanceEquipment, icon: AlertTriangle, color: 'bg-yellow-500' },
-    { name: 'Total Fuel (L)', value: stats.totalFuelQuantity.toLocaleString(), icon: Fuel, color: 'bg-orange-500' },
+    { name: 'Active Trips', value: stats.activeTrips || 0, icon: MapPin, color: 'bg-purple-500' },
+    { name: 'HOS Violations', value: stats.hosViolations || 0, icon: Shield, color: 'bg-red-500' },
+    { name: 'Maintenance Due', value: stats.maintenanceDue || 0, icon: AlertTriangle, color: 'bg-yellow-500' },
+    { name: 'Avg Fuel Efficiency', value: `${(stats.avgFuelEfficiency || 0).toFixed(1)} MPG`, icon: Fuel, color: 'bg-orange-500' },
   ];
 
   // Process fuel logs for chart
