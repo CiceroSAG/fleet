@@ -25,12 +25,15 @@ interface DriverBehaviorEvent {
 export default function DriverBehavior() {
   const [events, setEvents] = useState<DriverBehaviorEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [filter, setFilter] = useState({
     eventType: 'all',
     severity: 'all',
     dateRange: '7' // days
   });
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  useEffect(() => {
+    fetchDriverBehaviorEvents();
+  }, [filter]);
 
   const queryClient = useQueryClient();
   const { data: operators } = useQuery({ queryKey: ['operators'], queryFn: getOperators });
