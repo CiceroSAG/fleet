@@ -105,11 +105,8 @@ export async function updateEquipment(id: string, equipment: any) {
       await createMaintenanceLog({
         equipment_id: id,
         date: new Date().toISOString().split('T')[0],
-        maintenance_type: 'corrective',
-        description: 'Equipment status changed to Under Maintenance',
-        hours_worked: 0,
+        service_type: 'emergency',
         cost: 0,
-        performed_by: null, // Will be set by current user if available
         notes: 'Automatic log created when equipment status changed to Under Maintenance'
       });
     } catch (logError) {

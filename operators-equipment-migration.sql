@@ -22,6 +22,8 @@ ALTER TABLE maintenance_logs ADD COLUMN IF NOT EXISTS performed_by UUID REFERENC
 ALTER TABLE maintenance_logs ADD COLUMN IF NOT EXISTS hours_worked DECIMAL(5, 2);
 ALTER TABLE maintenance_logs ADD COLUMN IF NOT EXISTS parts_used JSONB;
 ALTER TABLE maintenance_logs ADD COLUMN IF NOT EXISTS next_service_due DATE;
+ALTER TABLE maintenance_logs ADD COLUMN IF NOT EXISTS maintenance_type TEXT DEFAULT 'preventive';
+ALTER TABLE maintenance_logs ADD COLUMN IF NOT EXISTS description TEXT;
 
 -- Add missing columns to fuel_logs table
 ALTER TABLE fuel_logs ADD COLUMN IF NOT EXISTS price_per_gallon DECIMAL(5, 3);

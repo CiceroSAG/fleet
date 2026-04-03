@@ -138,11 +138,11 @@ export default function Dashboard() {
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Fuel Consumption & Cost</h3>
           </div>
-          <div className="p-6 h-80">
+          <div className="p-6" style={{ height: '320px', minHeight: '320px' }}>
             {fuelChartData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-gray-500">No fuel data available</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
+              <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={fuelChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
@@ -162,11 +162,11 @@ export default function Dashboard() {
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Equipment Status</h3>
           </div>
-          <div className="p-6 h-80">
+          <div className="p-6" style={{ height: '320px', minHeight: '320px' }}>
             {stats.equipmentStatusData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-gray-500">No equipment data</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
+              <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
                     data={stats.equipmentStatusData}
@@ -195,11 +195,11 @@ export default function Dashboard() {
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Maintenance Costs</h3>
           </div>
-          <div className="p-6 h-80">
+          <div className="p-6" style={{ height: '320px', minHeight: '320px' }}>
             {maintenanceChartData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-gray-500">No maintenance data available</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
+              <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={maintenanceChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
