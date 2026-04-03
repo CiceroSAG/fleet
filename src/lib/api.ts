@@ -162,6 +162,12 @@ export async function createFuelLog(log: any) {
     .insert([log])
     .select();
   if (error) throw error;
+
+  // Calculate fuel efficiency after creating log
+  if (data && data[0]) {
+    await calculateFuelEfficiencyFromFuelLog(data[0].id);
+  }
+
   return data[0];
 }
 
@@ -203,6 +209,12 @@ export async function createMaintenanceLog(log: any) {
     .insert([log])
     .select();
   if (error) throw error;
+
+  // Update maintenance schedule after creating log
+  if (data && data[0]) {
+    await updateMaintenanceScheduleFromLog(data[0].id);
+  }
+
   return data[0];
 }
 
@@ -1062,6 +1074,79 @@ export async function createTripFromGPS(equipmentId: string, startTime: string, 
   }
 }
 
+// Auto-update maintenance schedule when maintenance log is created
+export async function updateMaintenanceScheduleFromLog(maintenanceLogId: string) {
+  try {
+    // Get the maintenance log with equipment details
+    const { data: maintenanceLog, error: logError } = await supabase
+      .from('maintenance_logs')
+      .select(`
+        *,
+        equipment:equipment_id (
+          id,
+          asset_tag
+        )
+      `)
+      .eq('id', maintenanceLogId)
+      .single();
+
+    if (logError || !maintenanceLog) return;
+
+    // Find the corresponding maintenance schedule
+    const { data: schedule, error: scheduleError } = await supabase
+      .from('maintenance_schedules')
+      .select('*')
+      .eq('equipment_id', maintenanceLog.equipment_id)
+      .eq('maintenance_type', maintenanceLog.maintenance_type || 'preventive')
+      .eq('status', 'active')
+      .single();
+
+    if (scheduleError || !schedule) {
+      // No active schedule found, create one if this was preventive maintenance
+      if (maintenanceLog.maintenance_type === 'preventive' || !maintenanceLog.maintenance_type) {
+        const settings = await getSettings();
+        const nextDue = new Date(maintenanceLog.date);
+        nextDue.setDate(nextDue.getDate() + (settings?.preventive_maintenance_interval || 90));
+
+        await createMaintenanceSchedule({
+          equipment_id: maintenanceLog.equipment_id,
+          maintenance_type: 'preventive',
+          description: 'Preventive maintenance schedule',
+          interval_type: 'days',
+          interval_value: settings?.preventive_maintenance_interval || 90,
+          next_due: nextDue.toISOString(),
+          last_completed: maintenanceLog.date,
+          priority: 'medium',
+          status: 'active',
+          notes: `Auto-created from maintenance log on ${maintenanceLog.date}`
+        });
+      }
+      return;
+    }
+
+    // Update the schedule with new next due date and last completed
+    const nextDue = new Date(maintenanceLog.date);
+    if (schedule.interval_type === 'days') {
+      nextDue.setDate(nextDue.getDate() + schedule.interval_value);
+    } else if (schedule.interval_type === 'hours') {
+      // For hours-based, we'd need to track equipment hours - simplified for now
+      nextDue.setDate(nextDue.getDate() + Math.ceil(schedule.interval_value / 8)); // Assume 8 hours/day
+    } else if (schedule.interval_type === 'miles') {
+      // For miles-based, we'd need odometer readings - simplified for now
+      nextDue.setDate(nextDue.getDate() + 30); // Default to 30 days
+    }
+
+    await updateMaintenanceSchedule(schedule.id, {
+      last_completed: maintenanceLog.date,
+      next_due: nextDue.toISOString(),
+      status: 'active' // Reset to active after completion
+    });
+
+  } catch (error) {
+    console.error('Error updating maintenance schedule from log:', error);
+  }
+}
+
 // Get dashboard summary with integrated data
 export async function getDashboardSummary() {
   try {
@@ -1079,7 +1164,7 @@ export async function getDashboardSummary() {
 
     // Calculate summary metrics
     const totalEquipment = equipment?.length || 0;
-    const activeEquipment = equipment?.filter(e => e.status === 'active').length || 0;
+    const activeEquipment = equipment?.filter(e => e.status === 'Active').length || 0;
     const totalOperators = operators?.length || 0;
     const activeTrips = trips?.filter(t => t.status === 'in_progress').length || 0;
 

@@ -142,7 +142,7 @@ export default function Dashboard() {
             {fuelChartData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-gray-500">No fuel data available</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
                 <BarChart data={fuelChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
@@ -166,7 +166,7 @@ export default function Dashboard() {
             {stats.equipmentStatusData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-gray-500">No equipment data</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
                 <PieChart>
                   <Pie
                     data={stats.equipmentStatusData}
@@ -199,7 +199,7 @@ export default function Dashboard() {
             {maintenanceChartData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-gray-500">No maintenance data available</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
                 <LineChart data={maintenanceChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
