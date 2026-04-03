@@ -24,6 +24,7 @@ import FuelManagement from './pages/FuelManagement';
 import MaintenanceScheduling from './pages/MaintenanceScheduling';
 import ComplianceManagement from './pages/ComplianceManagement';
 import AssetUtilization from './pages/AssetUtilization';
+import Reports from './pages/Reports';
 
 const queryClient = new QueryClient();
 
@@ -66,7 +67,8 @@ export default function App() {
             <Route path="fuel-management" element={<FuelManagement />} />
             <Route path="maintenance-scheduling" element={<MaintenanceScheduling />} />
             <Route path="compliance" element={<ComplianceManagement />} />
-            <Route path="utilization" element={<AssetUtilization />} />            </Route>
+            <Route path="utilization" element={<AssetUtilization />} />
+            <Route path="reports" element={<Reports />} />            </Route>
           </Routes>
         </BrowserRouter>
       </AuthProvider>

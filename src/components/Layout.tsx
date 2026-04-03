@@ -17,7 +17,8 @@ import {
   BarChart3,
   Calendar,
   FileCheck,
-  TrendingUp
+  TrendingUp,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -38,6 +39,7 @@ const navigation = [
   { name: 'Maintenance Scheduling', href: '/maintenance-scheduling', icon: Calendar },
   { name: 'Compliance', href: '/compliance', icon: FileCheck },
   { name: 'Asset Utilization', href: '/utilization', icon: TrendingUp },
+  { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: SettingsIcon },
 ];
 
