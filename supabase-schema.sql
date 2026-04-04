@@ -249,6 +249,52 @@ CREATE TABLE utilization_metrics (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Notifications
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) NOT NULL,
+  type TEXT NOT NULL, -- alert, warning, info, maintenance, fuel, compliance, incident
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  read BOOLEAN DEFAULT FALSE,
+  related_id UUID, -- can reference equipment, incident, etc.
+  related_table TEXT, -- equipment, incidents, etc.
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Parts Inventory Management
+CREATE TABLE parts_suppliers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  contact_person TEXT,
+  email TEXT,
+  phone TEXT,
+  address TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE parts_inventory (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  part_number TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  current_stock INTEGER NOT NULL DEFAULT 0,
+  min_stock INTEGER NOT NULL DEFAULT 0,
+  max_stock INTEGER,
+  unit_cost DECIMAL(8, 2),
+  supplier_id UUID REFERENCES parts_suppliers(id),
+  category TEXT, -- engine, transmission, tires, etc.
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE equipment_parts_mapping (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  equipment_id UUID REFERENCES equipment(id) NOT NULL,
+  part_id UUID REFERENCES parts_inventory(id) NOT NULL,
+  quantity_needed INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 3. Row Level Security (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
@@ -313,6 +359,7 @@ ALTER TABLE dvir_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE maintenance_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fuel_efficiency_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE utilization_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Vehicle Locations: Authenticated users can read, admins/managers can manage
 CREATE POLICY "Allow read access to authenticated users" ON vehicle_locations FOR SELECT TO authenticated USING (true);
@@ -373,5 +420,11 @@ CREATE POLICY "Allow all access to Admins and Managers" ON fuel_efficiency_metri
 -- Utilization Metrics: Authenticated users can read, admins/managers can manage
 CREATE POLICY "Allow read access to authenticated users" ON utilization_metrics FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow all access to Admins and Managers" ON utilization_metrics FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
+);
+
+-- Notifications: Users can view their own, admins/managers can manage all
+CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Allow all access to Admins and Managers" ON notifications FOR ALL TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
 );

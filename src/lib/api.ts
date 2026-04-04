@@ -322,6 +322,20 @@ export async function createIncident(incident: any) {
     .insert([incident])
     .select();
   if (error) throw error;
+
+  // Create notification for admins about new incident
+  const admins = await getAdminProfiles();
+  for (const admin of admins) {
+    await createNotification({
+      user_id: admin.id,
+      type: 'incident',
+      title: 'New Incident Reported',
+      message: `A new incident has been reported for equipment ${incident.equipment_id}`,
+      related_id: data[0].id,
+      related_table: 'incidents'
+    });
+  }
+
   return data[0];
 }
 
@@ -1305,6 +1319,9 @@ export async function getDashboardStats() {
     return lastMaint < ninetyDaysAgo;
   }).map(e => e.asset_tag);
 
+  // Create notifications for overdue maintenance
+  await createMaintenanceOverdueNotifications(overdueEquipment);
+
   // Merge with integrated summary data
   return {
     ...summary,
@@ -1360,5 +1377,87 @@ export async function getMaintenanceSchedulesWithUnderMaintenance() {
   }));
 
   return [...schedules, ...underMaintenanceSchedules];
+}
+
+// --- Notifications ---
+export async function getNotifications() {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function createNotification(notification: any) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert([notification])
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function markNotificationAsRead(id: string) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function deleteNotification(id: string) {
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// Get admin and manager profiles for notifications
+export async function getAdminProfiles() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email')
+    .in('role', ['Admin', 'Manager']);
+  if (error) throw error;
+  return data;
+}
+
+// Create maintenance overdue notifications
+export async function createMaintenanceOverdueNotifications(overdueEquipment: string[]) {
+  if (overdueEquipment.length === 0) return;
+
+  const admins = await getAdminProfiles();
+  const notifications = [];
+
+  for (const admin of admins) {
+    notifications.push({
+      user_id: admin.id,
+      type: 'maintenance',
+      title: 'Maintenance Overdue',
+      message: `${overdueEquipment.length} equipment items are overdue for maintenance: ${overdueEquipment.join(', ')}`,
+      related_table: 'equipment'
+    });
+  }
+
+  // Create notifications (ignore if they already exist for today)
+  for (const notification of notifications) {
+    // Check if similar notification exists today
+    const today = new Date().toISOString().split('T')[0];
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', notification.user_id)
+      .eq('type', 'maintenance')
+      .gte('created_at', `${today}T00:00:00`)
+      .limit(1);
+
+    if (!existing || existing.length === 0) {
+      await createNotification(notification);
+    }
+  }
 }
 

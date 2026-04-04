@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useQuery } from '@tanstack/react-query';
 import { getSettings } from '@/lib/api';
+import Notifications from './Notifications';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -141,6 +142,23 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden pt-16 md:pt-0 w-full">
+        {/* Desktop top bar */}
+        <div className="hidden md:flex h-16 bg-white border-b border-gray-200 items-center justify-between px-6">
+          <div className="flex items-center">
+            <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Notifications />
+            <div className="flex items-center">
+              <span className="text-sm text-gray-700 mr-2">
+                {profile?.email || 'User'}
+              </span>
+              <span className="text-xs text-gray-500">
+                ({profile?.role || 'Loading...'})
+              </span>
+            </div>
+          </div>
+        </div>
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />
         </main>
