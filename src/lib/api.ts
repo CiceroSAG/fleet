@@ -1461,3 +1461,185 @@ export async function createMaintenanceOverdueNotifications(overdueEquipment: st
   }
 }
 
+// --- Parts Inventory Management ---
+export async function getPartsSuppliers() {
+  const { data, error } = await supabase
+    .from('parts_suppliers')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data;
+}
+
+export async function createPartsSupplier(supplier: any) {
+  const { data, error } = await supabase
+    .from('parts_suppliers')
+    .insert([supplier])
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function updatePartsSupplier(id: string, supplier: any) {
+  const { data, error } = await supabase
+    .from('parts_suppliers')
+    .update(supplier)
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function deletePartsSupplier(id: string) {
+  const { error } = await supabase
+    .from('parts_suppliers')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function getPartsInventory() {
+  const { data, error } = await supabase
+    .from('parts_inventory')
+    .select(`
+      *,
+      parts_suppliers (
+        name
+      )
+    `)
+    .order('name');
+  if (error) throw error;
+  return data;
+}
+
+export async function createPart(part: any) {
+  const { data, error } = await supabase
+    .from('parts_inventory')
+    .insert([part])
+    .select();
+  if (error) throw error;
+
+  // Check for reorder alert
+  if (data[0].current_stock <= data[0].min_stock) {
+    await createReorderNotification(data[0]);
+  }
+
+  return data[0];
+}
+
+export async function updatePart(id: string, part: any) {
+  const { data, error } = await supabase
+    .from('parts_inventory')
+    .update(part)
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+
+  // Check for reorder alert
+  if (data[0].current_stock <= data[0].min_stock) {
+    await createReorderNotification(data[0]);
+  }
+
+  return data[0];
+}
+
+export async function deletePart(id: string) {
+  const { error } = await supabase
+    .from('parts_inventory')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function getEquipmentPartsMapping() {
+  const { data, error } = await supabase
+    .from('equipment_parts_mapping')
+    .select(`
+      *,
+      equipment (
+        asset_tag,
+        type
+      ),
+      parts_inventory (
+        part_number,
+        name
+      )
+    `)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function createEquipmentPartsMapping(mapping: any) {
+  const { data, error } = await supabase
+    .from('equipment_parts_mapping')
+    .insert([mapping])
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function updateEquipmentPartsMapping(id: string, mapping: any) {
+  const { data, error } = await supabase
+    .from('equipment_parts_mapping')
+    .update(mapping)
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function deleteEquipmentPartsMapping(id: string) {
+  const { error } = await supabase
+    .from('equipment_parts_mapping')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// Create reorder notification
+async function createReorderNotification(part: any) {
+  const admins = await getAdminProfiles();
+  for (const admin of admins) {
+    await createNotification({
+      user_id: admin.id,
+      type: 'inventory',
+      title: 'Parts Reorder Alert',
+      message: `Part ${part.name} (${part.part_number}) is below minimum stock level. Current: ${part.current_stock}, Minimum: ${part.min_stock}`,
+      related_id: part.id,
+      related_table: 'parts_inventory'
+    });
+  }
+}
+
+// --- Dashboard Configuration ---
+export async function getDashboardConfig() {
+  const { data, error } = await supabase
+    .from('dashboard_configs')
+    .select('*')
+    .single();
+  if (error && error.code !== 'PGRST116') throw error; // PGRST116 is no rows returned
+  return data;
+}
+
+export async function updateDashboardConfig(config: any) {
+  const existing = await getDashboardConfig();
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('dashboard_configs')
+      .update({ config, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+      .select();
+    if (error) throw error;
+    return data[0];
+  } else {
+    const { data, error } = await supabase
+      .from('dashboard_configs')
+      .insert([{ config }])
+      .select();
+    if (error) throw error;
+    return data[0];
+  }
+}
+

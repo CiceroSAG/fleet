@@ -18,7 +18,8 @@ import {
   Calendar,
   FileCheck,
   TrendingUp,
-  FileText
+  FileText,
+  Package
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Vehicles & Equipment', href: '/equipment', icon: Tractor },
   { name: 'Operators', href: '/operators', icon: Users },
   { name: 'Fuel Logs', href: '/fuel', icon: Fuel },
+  { name: 'Parts Inventory', href: '/parts', icon: Package },
   { name: 'Maintenance', href: '/maintenance', icon: Wrench },
   { name: 'Repairs', href: '/repairs', icon: Hammer },
   { name: 'Incidents', href: '/incidents', icon: AlertTriangle },

@@ -25,6 +25,7 @@ import MaintenanceScheduling from './pages/MaintenanceScheduling';
 import ComplianceManagement from './pages/ComplianceManagement';
 import AssetUtilization from './pages/AssetUtilization';
 import Reports from './pages/Reports';
+import PartsInventory from './pages/PartsInventory';
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ export default function App() {
               <Route path="equipment/:id" element={<EquipmentDetails />} />
               <Route path="operators" element={<OperatorsList />} />
               <Route path="fuel" element={<FuelLogs />} />
+              <Route path="parts" element={<PartsInventory />} />
               <Route path="maintenance" element={<Maintenance />} />
               <Route path="repairs" element={<Repairs />} />
               <Route path="incidents" element={<Incidents />} />

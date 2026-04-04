@@ -65,6 +65,16 @@ CREATE TABLE equipment (
   assigned_operator_id UUID REFERENCES operators(id),
   current_location TEXT,
   status TEXT NOT NULL DEFAULT 'Active', -- Active, Under Maintenance, Out of Service, Damaged
+  -- Warranty and Lifecycle fields
+  purchase_date DATE,
+  purchase_price DECIMAL(10, 2),
+  warranty_start_date DATE,
+  warranty_end_date DATE,
+  warranty_provider TEXT,
+  depreciation_method TEXT DEFAULT 'straight_line', -- straight_line, declining_balance
+  salvage_value DECIMAL(10, 2) DEFAULT 0,
+  useful_life_years INTEGER,
+  current_book_value DECIMAL(10, 2),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -262,6 +272,16 @@ CREATE TABLE notifications (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Dashboard Configuration
+CREATE TABLE dashboard_configs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) NOT NULL,
+  config JSONB NOT NULL, -- widget layout, visibility, etc.
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
 -- Parts Inventory Management
 CREATE TABLE parts_suppliers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -360,6 +380,10 @@ ALTER TABLE maintenance_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fuel_efficiency_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE utilization_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parts_suppliers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parts_inventory ENABLE ROW LEVEL SECURITY;
+ALTER TABLE equipment_parts_mapping ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dashboard_configs ENABLE ROW LEVEL SECURITY;
 
 -- Vehicle Locations: Authenticated users can read, admins/managers can manage
 CREATE POLICY "Allow read access to authenticated users" ON vehicle_locations FOR SELECT TO authenticated USING (true);
@@ -428,3 +452,24 @@ CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USI
 CREATE POLICY "Allow all access to Admins and Managers" ON notifications FOR ALL TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
 );
+
+-- Parts Suppliers: Authenticated users can read, admins/managers can manage
+CREATE POLICY "Allow read access to authenticated users" ON parts_suppliers FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow all access to Admins and Managers" ON parts_suppliers FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
+);
+
+-- Parts Inventory: Authenticated users can read, admins/managers can manage
+CREATE POLICY "Allow read access to authenticated users" ON parts_inventory FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow all access to Admins and Managers" ON parts_inventory FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
+);
+
+-- Equipment Parts Mapping: Authenticated users can read, admins/managers can manage
+CREATE POLICY "Allow read access to authenticated users" ON equipment_parts_mapping FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow all access to Admins and Managers" ON equipment_parts_mapping FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
+);
+
+-- Dashboard Configs: Users can manage their own configs
+CREATE POLICY "Users can manage own dashboard config" ON dashboard_configs FOR ALL TO authenticated USING (user_id = auth.uid());
