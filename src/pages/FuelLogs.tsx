@@ -180,7 +180,7 @@ export default function FuelLogs() {
                 onChange={(e) => setEquipmentFilter(e.target.value)}
                 className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
               >
-                <option value="all">All Equipment</option>
+                <option key="all" value="all">All Equipment</option>
                 {equipmentOptions.map((eq: any) => (
                   <option key={eq.id} value={eq.id}>
                     {eq.asset_tag} ({eq.type})
@@ -228,7 +228,7 @@ export default function FuelLogs() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{item.quantity}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{currencySymbol}{item.cost}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{item.odometer || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{item.odometer_reading || '-'}</td>
                     {canEditDelete && (
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                         <button

@@ -3,18 +3,18 @@ import { supabase } from '@/lib/supabase';
 import { Fuel, TrendingUp, TrendingDown, DollarSign, AlertTriangle, Lightbulb, MapPin } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
-import { detectFuelAnomalies, getFuelEfficiencyOptimization, getFuelStationOptimization } from '@/lib/api';
+import { detectFuelAnomalies, getFuelEfficiencyOptimization, getFuelStationOptimization, getFuelEfficiencyMetrics } from '@/lib/api';
 
 interface FuelEfficiencyMetric {
   id: string;
   equipment_id: string;
   date: string;
-  fuel_consumed: number;
+  fuel_consumption: number;
   distance_traveled: number;
-  mpg: number;
+  efficiency_mpg: number;
   cost_per_mile: number;
-  idle_time_hours: number;
-  idle_fuel_wasted: number;
+  idle_time_hours?: number;
+  idle_fuel_wasted?: number;
   equipment: {
     asset_tag: string;
     type: string;
@@ -43,42 +43,27 @@ export default function FuelManagement() {
     queryFn: getFuelStationOptimization
   });
 
-  const fetchFuelMetrics = async () => {
-    try {
-      const days = parseInt(selectedPeriod);
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+  const { data: metricsData, isLoading: metricsLoading } = useQuery({
+    queryKey: ['fuelEfficiencyMetrics', selectedPeriod],
+    queryFn: () => getFuelEfficiencyMetrics(100)
+  });
 
-      const { data, error } = await supabase
-        .from('fuel_efficiency_metrics')
-        .select(`
-          *,
-          equipment:equipment_id (
-            asset_tag,
-            type
-          )
-        `)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-
-      if (error) throw error;
-      setMetrics(data || []);
-    } catch (error) {
-      console.error('Error fetching fuel metrics:', error);
-    } finally {
+  useEffect(() => {
+    if (metricsData) {
+      setMetrics(metricsData);
       setLoading(false);
     }
-  };
+  }, [metricsData]);
 
   // Calculate summary statistics
   const stats = React.useMemo(() => {
     if (metrics.length === 0) return null;
 
-    const totalFuel = metrics.reduce((sum, m) => sum + m.fuel_consumed, 0);
-    const totalDistance = metrics.reduce((sum, m) => sum + m.distance_traveled, 0);
-    const avgMPG = metrics.reduce((sum, m) => sum + m.mpg, 0) / metrics.length;
-    const totalIdleFuel = metrics.reduce((sum, m) => sum + m.idle_fuel_wasted, 0);
-    const avgCostPerMile = metrics.reduce((sum, m) => sum + m.cost_per_mile, 0) / metrics.length;
+    const totalFuel = metrics.reduce((sum, m) => sum + (m.fuel_consumption || 0), 0);
+    const totalDistance = metrics.reduce((sum, m) => sum + (m.distance_traveled || 0), 0);
+    const avgMPG = metrics.reduce((sum, m) => sum + (m.efficiency_mpg || 0), 0) / metrics.length;
+    const totalIdleFuel = metrics.reduce((sum, m) => sum + (m.idle_fuel_wasted || 0), 0);
+    const avgCostPerMile = metrics.reduce((sum, m) => sum + (m.cost_per_mile || 0), 0) / metrics.length;
 
     return {
       totalFuel: Math.round(totalFuel * 10) / 10,
@@ -86,7 +71,7 @@ export default function FuelManagement() {
       avgMPG: Math.round(avgMPG * 10) / 10,
       totalIdleFuel: Math.round(totalIdleFuel * 10) / 10,
       avgCostPerMile: Math.round(avgCostPerMile * 100) / 100,
-      fuelEfficiency: Math.round((totalIdleFuel / totalFuel) * 100 * 10) / 10
+      fuelEfficiency: totalFuel > 0 ? Math.round((totalIdleFuel / totalFuel) * 100 * 10) / 10 : 0
     };
   }, [metrics]);
 
@@ -103,9 +88,9 @@ export default function FuelManagement() {
           count: 0
         };
       }
-      acc[date].totalFuel += metric.fuel_consumed;
-      acc[date].totalDistance += metric.distance_traveled;
-      acc[date].avgMPG = (acc[date].avgMPG * acc[date].count + metric.mpg) / (acc[date].count + 1);
+      acc[date].totalFuel += (metric.fuel_consumption || 0);
+      acc[date].totalDistance += (metric.distance_traveled || 0);
+      acc[date].avgMPG = (acc[date].avgMPG * acc[date].count + (metric.efficiency_mpg || 0)) / (acc[date].count + 1);
       acc[date].count += 1;
       return acc;
     }, {} as Record<string, any>);
@@ -399,22 +384,22 @@ export default function FuelManagement() {
                         {new Date(metric.date).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {metric.fuel_consumed} gal
+                        {metric.fuel_consumption} gal
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {metric.distance_traveled} mi
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {metric.mpg}
+                        {metric.efficiency_mpg}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         ${metric.cost_per_mile}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {metric.idle_time_hours}h
+                        {metric.idle_time_hours || 0}h
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {metric.idle_fuel_wasted} gal
+                        {metric.idle_fuel_wasted || 0} gal
                       </td>
                     </tr>
                   ))}

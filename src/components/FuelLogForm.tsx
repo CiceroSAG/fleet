@@ -12,7 +12,7 @@ const fuelLogSchema = z.object({
   date: z.string().min(1, 'Date is required'),
   quantity: z.coerce.number().min(0.1, 'Quantity must be greater than 0'),
   cost: z.coerce.number().min(0, 'Cost must be 0 or greater'),
-  odometer: z.coerce.number().optional(),
+  odometer_reading: z.coerce.number().optional(),
 });
 
 type FuelLogFormData = z.infer<typeof fuelLogSchema>;
@@ -24,7 +24,10 @@ interface FuelLogFormProps {
 
 export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
   const queryClient = useQueryClient();
-  const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
+  const { data: equipment } = useQuery({ 
+    queryKey: ['equipment'], 
+    queryFn: getEquipment
+  });
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings });
   const currencySymbol = getCurrencySymbol(settings?.currency);
 
@@ -35,33 +38,38 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
       date: log?.date ? new Date(log.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
       quantity: log?.quantity || 0,
       cost: log?.cost || 0,
-      odometer: log?.odometer || undefined,
+      odometer_reading: log?.odometer_reading || undefined,
     }
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   const createMutation = useMutation({
     mutationFn: createFuelLog,
-    onSuccess: async (newLog) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fuelLogs'] });
-      // Calculate fuel efficiency metrics
-      await calculateFuelEfficiencyFromFuelLog(newLog.id);
       queryClient.invalidateQueries({ queryKey: ['fuelEfficiencyMetrics'] });
       onClose();
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Failed to save fuel log');
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: FuelLogFormData) => updateFuelLog(log.id, data),
-    onSuccess: async (updatedLog) => {
+    mutationFn: (data: any) => updateFuelLog(log!.id, data),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fuelLogs'] });
-      // Recalculate fuel efficiency metrics
-      await calculateFuelEfficiencyFromFuelLog(updatedLog.id);
       queryClient.invalidateQueries({ queryKey: ['fuelEfficiencyMetrics'] });
       onClose();
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Failed to update fuel log');
     }
   });
 
   const onSubmit = (data: FuelLogFormData) => {
+    setError(null);
     // Convert local datetime-local string to ISO string for DB
     const payload = {
       ...data,
@@ -93,6 +101,11 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-md">
+              {error}
+            </div>
+          )}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Equipment *</label>
@@ -100,7 +113,7 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
                 {...register('equipment_id')}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
               >
-                <option value="">Select Equipment</option>
+                <option key="default" value="">Select Equipment</option>
                 {equipment?.map((eq: any) => (
                   <option key={eq.id} value={eq.id}>{eq.asset_tag} - {eq.type}</option>
                 ))}
@@ -145,7 +158,7 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
               <input
                 type="number"
                 step="0.1"
-                {...register('odometer')}
+                {...register('odometer_reading')}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
               />
             </div>

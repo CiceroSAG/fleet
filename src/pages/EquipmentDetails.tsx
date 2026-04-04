@@ -164,10 +164,12 @@ export default function EquipmentDetails() {
                           {event.type === 'repair' && <>Repair logged: <span className="font-medium text-gray-900">{event.issue_description}</span></>}
                           {event.type === 'incident' && <>Incident reported: <span className="font-medium text-gray-900">{event.type_of_damage}</span> (Severity: {event.severity})</>}
                         </p>
-                        {(event.notes || event.odometer) && (
+                        {(event.notes || event.odometer || event.odometer_reading) && (
                           <p className="mt-1 text-sm text-gray-500">
                             {event.notes && <span>Notes: {event.notes}</span>}
-                            {event.odometer && <span className="ml-2">Odometer: {event.odometer}</span>}
+                            {(event.odometer || event.odometer_reading) && (
+                              <span className="ml-2">Odometer: {event.odometer || event.odometer_reading}</span>
+                            )}
                           </p>
                         )}
                       </div>

@@ -38,6 +38,10 @@ export default function MaintenanceScheduling() {
 
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    fetchMaintenanceSchedules();
+  }, [filter]);
+
   // New queries for optimization features
   const { data: workload } = useQuery({
     queryKey: ['maintenanceWorkload'],
@@ -69,6 +73,11 @@ export default function MaintenanceScheduling() {
   });
 
   const fetchMaintenanceSchedules = async () => {
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+      setSchedules([]);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await getMaintenanceSchedulesWithUnderMaintenance();
 
@@ -96,6 +105,10 @@ export default function MaintenanceScheduling() {
   };
 
   const updateScheduleStatus = async (id: string, status: string) => {
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+      setSchedules(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+      return;
+    }
     try {
       // Handle equipment under maintenance (they have special IDs)
       if (id.startsWith('under-maintenance-')) {

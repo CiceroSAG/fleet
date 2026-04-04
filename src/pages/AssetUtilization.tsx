@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getUtilizationMetrics } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
 import { TrendingUp, TrendingDown, Activity, DollarSign } from 'lucide-react';
 
 interface UtilizationMetric {
@@ -20,42 +23,29 @@ interface UtilizationMetric {
   };
 }
 
+// ... (interfaces)
+
 export default function AssetUtilization() {
   const [metrics, setMetrics] = useState<UtilizationMetric[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('30'); // days
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('chart');
 
+  const { data: metricsData, isLoading: metricsLoading } = useQuery({
+    queryKey: ['utilizationMetrics', selectedPeriod],
+    queryFn: () => getUtilizationMetrics(100)
+  });
+
   useEffect(() => {
-    fetchUtilizationMetrics();
-  }, [selectedPeriod]);
-
-  const fetchUtilizationMetrics = async () => {
-    try {
-      const days = parseInt(selectedPeriod);
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const { data, error } = await supabase
-        .from('utilization_metrics')
-        .select(`
-          *,
-          equipment:equipment_id (
-            asset_tag,
-            type
-          )
-        `)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-
-      if (error) throw error;
-      setMetrics(data || []);
-    } catch (error) {
-      console.error('Error fetching utilization metrics:', error);
-    } finally {
+    if (metricsData) {
+      setMetrics(metricsData);
       setLoading(false);
     }
-  };
+  }, [metricsData]);
+
+  useEffect(() => {
+    setLoading(metricsLoading);
+  }, [metricsLoading]);
 
   // Calculate summary statistics
   const stats = React.useMemo(() => {

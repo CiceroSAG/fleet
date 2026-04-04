@@ -30,6 +30,11 @@ export default function RealTimeTracking() {
 
   useEffect(() => {
     fetchLatestLocations();
+    
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+      return;
+    }
+
     // Set up real-time subscription
     const subscription = supabase
       .channel('vehicle_locations')
@@ -49,6 +54,48 @@ export default function RealTimeTracking() {
   }, []);
 
   const fetchLatestLocations = async () => {
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+      setLocations([
+        {
+          id: 'l1111111-1111-1111-1111-111111111111',
+          equipment_id: '11111111-1111-1111-1111-111111111111',
+          latitude: -1.2833,
+          longitude: 36.8167,
+          speed: 45,
+          heading: 90,
+          odometer: 10500,
+          engine_hours: 1200,
+          fuel_level: 65,
+          timestamp: new Date().toISOString(),
+          equipment: {
+            asset_tag: 'TRK-001',
+            type: 'Dump Truck',
+            assigned_operator_id: '00000000-0000-0000-0000-000000000001',
+            operators: { name: 'John Doe' }
+          }
+        },
+        {
+          id: 'l2222222-2222-2222-2222-222222222222',
+          equipment_id: '33333333-3333-3333-3333-333333333333',
+          latitude: -1.2921,
+          longitude: 36.8219,
+          speed: 0,
+          heading: 180,
+          odometer: 5300,
+          engine_hours: 450,
+          fuel_level: 85,
+          timestamp: new Date().toISOString(),
+          equipment: {
+            asset_tag: 'LV-001',
+            type: 'Light Vehicle',
+            assigned_operator_id: '00000000-0000-0000-0000-000000000002',
+            operators: { name: 'Jane Smith' }
+          }
+        }
+      ]);
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('vehicle_locations')

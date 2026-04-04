@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth';
 import { Tractor } from 'lucide-react';
 
 export default function Login() {
@@ -10,24 +11,13 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
+  const { session } = useAuth();
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/');
-      }
-    };
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate('/');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (session) {
+      navigate('/');
+    }
+  }, [session, navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();

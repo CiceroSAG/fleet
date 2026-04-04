@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AlertTriangle, TrendingUp, Users, Clock, Plus, Award, BarChart3, Target, TrendingDown } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { createDriverBehaviorEvent, checkDriverBehaviorForHOSViolations, getOperators, getEquipment, getDriverSafetyScores, getDriverBehaviorTrends, getPeerComparison } from '@/lib/api';
+import { createDriverBehaviorEvent, checkDriverBehaviorForHOSViolations, getOperators, getEquipment, getDriverSafetyScores, getDriverBehaviorTrends, getPeerComparison, getDriverBehaviorEvents } from '@/lib/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 interface DriverBehaviorEvent {
@@ -35,6 +35,7 @@ export default function DriverBehavior() {
   });
 
   const queryClient = useQueryClient();
+
   const { data: operators } = useQuery({ queryKey: ['operators'], queryFn: getOperators });
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
 
@@ -67,49 +68,21 @@ export default function DriverBehavior() {
     }
   });
 
-  const fetchDriverBehaviorEvents = async () => {
-    try {
-      let query = supabase
-        .from('driver_behavior_events')
-        .select(`
-          *,
-          equipment:equipment_id (
-            asset_tag
-          ),
-          operators:operator_id (
-            name
-          )
-        `)
-        .order('timestamp', { ascending: false });
+  const { data: eventsData, isLoading: eventsLoading } = useQuery({
+    queryKey: ['driverBehaviorEvents', filter],
+    queryFn: () => getDriverBehaviorEvents()
+  });
 
-      // Apply date filter
-      if (filter.dateRange !== 'all') {
-        const days = parseInt(filter.dateRange);
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
-        query = query.gte('timestamp', startDate.toISOString());
-      }
-
-      // Apply event type filter
-      if (filter.eventType !== 'all') {
-        query = query.eq('event_type', filter.eventType);
-      }
-
-      // Apply severity filter
-      if (filter.severity !== 'all') {
-        query = query.eq('severity', filter.severity);
-      }
-
-      const { data, error } = await query.limit(100);
-
-      if (error) throw error;
-      setEvents(data || []);
-    } catch (error) {
-      console.error('Error fetching driver behavior events:', error);
-    } finally {
+  useEffect(() => {
+    if (eventsData) {
+      setEvents(eventsData);
       setLoading(false);
     }
-  };
+  }, [eventsData]);
+
+  useEffect(() => {
+    setLoading(eventsLoading);
+  }, [eventsLoading]);
 
   const getEventTypeIcon = (eventType: string) => {
     switch (eventType) {
@@ -191,7 +164,7 @@ export default function DriverBehavior() {
             Add Test Event
           </button>
           <button
-            onClick={fetchDriverBehaviorEvents}
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['driverBehaviorEvents'] })}
             className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700"
           >
             Refresh Data

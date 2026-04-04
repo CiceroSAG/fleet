@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getHoursOfService, getDVIRReports } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 import { Clock, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface HoursOfService {
@@ -42,68 +44,31 @@ export default function ComplianceManagement() {
   const [activeTab, setActiveTab] = useState<'hos' | 'dvir'>('hos');
   const [selectedPeriod, setSelectedPeriod] = useState('7'); // days
 
+  const { data: hosDataQuery, isLoading: hosLoading } = useQuery({
+    queryKey: ['hoursOfService', selectedPeriod],
+    queryFn: () => getHoursOfService()
+  });
+
+  const { data: dvirDataQuery, isLoading: dvirLoading } = useQuery({
+    queryKey: ['dvirReports', selectedPeriod],
+    queryFn: () => getDVIRReports()
+  });
+
   useEffect(() => {
-    if (activeTab === 'hos') {
-      fetchHoursOfService();
-    } else {
-      fetchDVIRReports();
+    if (hosDataQuery) {
+      setHosData(hosDataQuery);
     }
-  }, [activeTab, selectedPeriod]);
+  }, [hosDataQuery]);
 
-  const fetchHoursOfService = async () => {
-    try {
-      const days = parseInt(selectedPeriod);
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const { data, error } = await supabase
-        .from('hours_of_service')
-        .select(`
-          *,
-          operators:operator_id (
-            name
-          )
-        `)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-
-      if (error) throw error;
-      setHosData(data || []);
-    } catch (error) {
-      console.error('Error fetching HoS data:', error);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (dvirDataQuery) {
+      setDvirReports(dvirDataQuery);
     }
-  };
+  }, [dvirDataQuery]);
 
-  const fetchDVIRReports = async () => {
-    try {
-      const days = parseInt(selectedPeriod);
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const { data, error } = await supabase
-        .from('dvir_reports')
-        .select(`
-          *,
-          equipment:equipment_id (
-            asset_tag
-          ),
-          operators:operator_id (
-            name
-          )
-        `)
-        .gte('report_date', startDate.toISOString().split('T')[0])
-        .order('report_date', { ascending: false });
-
-      if (error) throw error;
-      setDvirReports(data || []);
-    } catch (error) {
-      console.error('Error fetching DVIR reports:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    setLoading(hosLoading || dvirLoading);
+  }, [hosLoading, dvirLoading]);
 
   const getViolationStatus = (violations: any) => {
     if (!violations || violations.length === 0) return { status: 'compliant', color: 'text-green-600 bg-green-100' };

@@ -27,7 +27,14 @@ import AssetUtilization from './pages/AssetUtilization';
 import Reports from './pages/Reports';
 import PartsInventory from './pages/PartsInventory';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: import.meta.env.VITE_SUPABASE_URL ? 3 : false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth();

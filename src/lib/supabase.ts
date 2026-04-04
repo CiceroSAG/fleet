@@ -16,6 +16,14 @@ export const supabase = createClient(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true
+    },
+    global: {
+      fetch: (input, init) => {
+        if (!supabaseUrl || supabaseUrl === '') {
+          return Promise.reject(new Error('Supabase not configured'));
+        }
+        return fetch(input, init);
+      }
     }
   }
 );
