@@ -1643,3 +1643,678 @@ export async function updateDashboardConfig(config: any) {
   }
 }
 
+// --- Incident Investigation Workflow ---
+export async function createIncidentInvestigation(incidentId: string, investigation: any) {
+  // First, get the incident details
+  const { data: incident, error: incidentError } = await supabase
+    .from('incidents')
+    .select('*')
+    .eq('id', incidentId)
+    .single();
+
+  if (incidentError) throw incidentError;
+
+  // Create investigation record (we'll add this to incidents table or create a new table)
+  // For now, we'll update the incidents table with investigation data
+  const { data, error } = await supabase
+    .from('incidents')
+    .update({
+      investigation_data: investigation,
+      investigation_status: 'in_progress',
+      investigated_at: new Date().toISOString(),
+      investigated_by: investigation.investigator_id
+    })
+    .eq('id', incidentId)
+    .select();
+
+  if (error) throw error;
+
+  return data[0];
+}
+
+export async function getIncidentPatterns(timeframe: string = '30') {
+  const days = parseInt(timeframe);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const { data: incidents, error } = await supabase
+    .from('incidents')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag,
+        type
+      )
+    `)
+    .gte('date', startDate.toISOString())
+    .order('date', { ascending: false });
+
+  if (error) throw error;
+
+  // Analyze patterns
+  const patterns = {
+    byType: {} as Record<string, number>,
+    byEquipment: {} as Record<string, number>,
+    bySeverity: {} as Record<string, number>,
+    byMonth: {} as Record<string, number>,
+    trends: [] as any[]
+  };
+
+  incidents.forEach((incident: any) => {
+    // By type
+    patterns.byType[incident.type_of_damage] = (patterns.byType[incident.type_of_damage] || 0) + 1;
+
+    // By equipment
+    const equipmentKey = `${incident.equipment.asset_tag} (${incident.equipment.type})`;
+    patterns.byEquipment[equipmentKey] = (patterns.byEquipment[equipmentKey] || 0) + 1;
+
+    // By severity
+    patterns.bySeverity[incident.severity] = (patterns.bySeverity[incident.severity] || 0) + 1;
+
+    // By month
+    const monthKey = new Date(incident.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+    patterns.byMonth[monthKey] = (patterns.byMonth[monthKey] || 0) + 1;
+  });
+
+  // Calculate trends (compare current month with previous)
+  const months = Object.keys(patterns.byMonth).sort();
+  if (months.length >= 2) {
+    const currentMonth = months[months.length - 1];
+    const previousMonth = months[months.length - 2];
+    const currentCount = patterns.byMonth[currentMonth];
+    const previousCount = patterns.byMonth[previousMonth];
+    const change = ((currentCount - previousCount) / previousCount) * 100;
+
+    patterns.trends = [{
+      period: currentMonth,
+      incidents: currentCount,
+      change: change.toFixed(1),
+      trend: change > 0 ? 'increasing' : change < 0 ? 'decreasing' : 'stable'
+    }];
+  }
+
+  return patterns;
+}
+
+export async function getCorrectiveActions(incidentId: string) {
+  // Get incident and related data
+  const { data: incident, error } = await supabase
+    .from('incidents')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag,
+        type
+      ),
+      repair_logs (
+        id,
+        issue_description,
+        status,
+        cost
+      )
+    `)
+    .eq('id', incidentId)
+    .single();
+
+  if (error) throw error;
+
+  // Generate corrective action recommendations based on incident type
+  const recommendations = [];
+
+  switch (incident.type_of_damage.toLowerCase()) {
+    case 'engine failure':
+      recommendations.push(
+        { action: 'Schedule engine diagnostic', priority: 'high', department: 'Maintenance' },
+        { action: 'Review fuel quality and filtration', priority: 'medium', department: 'Operations' },
+        { action: 'Update preventive maintenance schedule', priority: 'medium', department: 'Maintenance' }
+      );
+      break;
+    case 'brake failure':
+      recommendations.push(
+        { action: 'Inspect all brake systems fleet-wide', priority: 'critical', department: 'Safety' },
+        { action: 'Review brake maintenance procedures', priority: 'high', department: 'Maintenance' },
+        { action: 'Implement brake performance monitoring', priority: 'medium', department: 'Operations' }
+      );
+      break;
+    case 'tire damage':
+      recommendations.push(
+        { action: 'Check tire pressure monitoring systems', priority: 'high', department: 'Maintenance' },
+        { action: 'Review tire rotation and replacement schedule', priority: 'medium', department: 'Operations' },
+        { action: 'Assess road conditions and driving routes', priority: 'low', department: 'Operations' }
+      );
+      break;
+    default:
+      recommendations.push(
+        { action: 'Conduct equipment inspection', priority: 'high', department: 'Maintenance' },
+        { action: 'Review operator training records', priority: 'medium', department: 'HR' },
+        { action: 'Update equipment usage guidelines', priority: 'medium', department: 'Operations' }
+      );
+  }
+
+  return {
+    incident,
+    recommendations,
+    relatedIncidents: [], // Could implement similar incident detection
+    preventiveMeasures: recommendations.filter(r => r.priority !== 'critical')
+  };
+}
+export async function getMaintenanceWorkload() {
+  // Get all profiles with role assignments
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('role', ['Admin', 'Manager']);
+
+  if (profilesError) throw profilesError;
+
+  // Get maintenance schedules assigned to each person
+  const { data: schedules, error: schedulesError } = await supabase
+    .from('maintenance_schedules')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag,
+        type
+      ),
+      profiles:assigned_to (
+        email
+      )
+    `)
+    .eq('status', 'active');
+
+  if (schedulesError) throw schedulesError;
+
+  // Calculate workload for each maintainer
+  const workload = new Map();
+
+  profiles.forEach((profile: any) => {
+    workload.set(profile.id, {
+      profile,
+      assignedTasks: 0,
+      highPriorityTasks: 0,
+      totalEstimatedHours: 0,
+      tasks: []
+    });
+  });
+
+  schedules.forEach((schedule: any) => {
+    if (schedule.assigned_to) {
+      const maintainer = workload.get(schedule.assigned_to);
+      if (maintainer) {
+        maintainer.assignedTasks++;
+        if (schedule.priority === 'high' || schedule.priority === 'critical') {
+          maintainer.highPriorityTasks++;
+        }
+        maintainer.totalEstimatedHours += schedule.estimated_cost || 0; // Using cost as proxy for hours
+        maintainer.tasks.push(schedule);
+      }
+    }
+  });
+
+  return Array.from(workload.values()).sort((a, b) => a.assignedTasks - b.assignedTasks);
+}
+
+export async function autoAssignMaintenance(scheduleId: string) {
+  const workload = await getMaintenanceWorkload();
+
+  if (workload.length === 0) {
+    throw new Error('No maintenance personnel available');
+  }
+
+  // Find the maintainer with the least workload
+  const bestAssignee = workload.reduce((best, current) => {
+    if (current.assignedTasks < best.assignedTasks) {
+      return current;
+    }
+    return best;
+  });
+
+  // Update the maintenance schedule
+  const { data, error } = await supabase
+    .from('maintenance_schedules')
+    .update({
+      assigned_to: bestAssignee.profile.id,
+      status: 'active'
+    })
+    .eq('id', scheduleId)
+    .select();
+
+  if (error) throw error;
+
+  return {
+    assignedTo: bestAssignee.profile,
+    schedule: data[0]
+  };
+}
+
+export async function checkPartsAvailability(scheduleId: string) {
+  // Get the maintenance schedule
+  const { data: schedule, error: scheduleError } = await supabase
+    .from('maintenance_schedules')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag,
+        type
+      )
+    `)
+    .eq('id', scheduleId)
+    .single();
+
+  if (scheduleError) throw scheduleError;
+
+  // Get required parts for this equipment
+  const { data: requiredParts, error: partsError } = await supabase
+    .from('equipment_parts_mapping')
+    .select(`
+      *,
+      parts_inventory (
+        part_number,
+        name,
+        current_stock,
+        min_stock
+      )
+    `)
+    .eq('equipment_id', schedule.equipment_id);
+
+  if (partsError) throw partsError;
+
+  // Check availability
+  const availability = requiredParts.map((mapping: any) => ({
+    part: mapping.parts_inventory,
+    required: mapping.quantity_needed,
+    available: mapping.parts_inventory.current_stock,
+    sufficient: mapping.parts_inventory.current_stock >= mapping.quantity_needed,
+    status: mapping.parts_inventory.current_stock >= mapping.quantity_needed ? 'available' :
+            mapping.parts_inventory.current_stock > 0 ? 'partial' : 'out_of_stock'
+  }));
+
+  const allAvailable = availability.every(item => item.sufficient);
+  const partiallyAvailable = availability.some(item => item.available > 0 && !item.sufficient);
+
+  return {
+    schedule,
+    partsAvailability: availability,
+    canProceed: allAvailable,
+    status: allAvailable ? 'ready' : partiallyAvailable ? 'partial' : 'blocked',
+    recommendations: allAvailable ? [] : [
+      'Order missing parts before scheduling',
+      'Consider alternative parts if available',
+      'Delay maintenance until parts arrive'
+    ]
+  };
+}
+
+export async function getMaintenanceOptimization() {
+  // Get all active maintenance schedules
+  const { data: schedules, error } = await supabase
+    .from('maintenance_schedules')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag,
+        type
+      ),
+      profiles:assigned_to (
+        email
+      )
+    `)
+    .eq('status', 'active')
+    .order('next_due', { ascending: true });
+
+  if (error) throw error;
+
+  const recommendations = [];
+  const now = new Date();
+  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+  // Check for overdue maintenance
+  const overdue = schedules.filter(s => new Date(s.next_due) < now);
+  if (overdue.length > 0) {
+    recommendations.push({
+      type: 'overdue_maintenance',
+      priority: 'critical',
+      count: overdue.length,
+      items: overdue.map(s => s.equipment.asset_tag),
+      action: 'Schedule immediate maintenance'
+    });
+  }
+
+  // Check for maintenance due within 3 days
+  const dueSoon = schedules.filter(s =>
+    new Date(s.next_due) >= now && new Date(s.next_due) <= threeDaysFromNow
+  );
+  if (dueSoon.length > 0) {
+    recommendations.push({
+      type: 'maintenance_due_soon',
+      priority: 'high',
+      count: dueSoon.length,
+      items: dueSoon.map(s => s.equipment.asset_tag),
+      action: 'Prepare for upcoming maintenance'
+    });
+  }
+
+  // Check for unassigned maintenance
+  const unassigned = schedules.filter(s => !s.assigned_to);
+  if (unassigned.length > 0) {
+    recommendations.push({
+      type: 'unassigned_maintenance',
+      priority: 'medium',
+      count: unassigned.length,
+      items: unassigned.map(s => s.equipment.asset_tag),
+      action: 'Assign maintenance tasks to technicians'
+    });
+  }
+
+  return recommendations;
+}
+export async function detectFuelAnomalies(equipmentId?: string) {
+  // Get fuel logs for analysis
+  const { data: fuelLogs, error } = await supabase
+    .from('fuel_logs')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag,
+        type
+      )
+    `)
+    .order('date', { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+
+  const anomalies = [];
+
+  // Group by equipment
+  const equipmentLogs = new Map();
+  fuelLogs.forEach((log: any) => {
+    if (!equipmentLogs.has(log.equipment_id)) {
+      equipmentLogs.set(log.equipment_id, []);
+    }
+    equipmentLogs.get(log.equipment_id).push(log);
+  });
+
+  // Analyze each equipment's fuel patterns
+  for (const [eqId, logs] of equipmentLogs) {
+    if (logs.length < 3) continue; // Need minimum data
+
+    const sortedLogs = logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate average fuel consumption
+    const avgConsumption = sortedLogs.reduce((sum, log) => sum + log.quantity, 0) / sortedLogs.length;
+
+    // Check for unusual consumption patterns
+    sortedLogs.forEach((log, index) => {
+      if (index < 2) return; // Skip first two for baseline
+
+      const recentAvg = sortedLogs.slice(index - 2, index + 1).reduce((sum, l) => sum + l.quantity, 0) / 3;
+      const deviation = Math.abs(log.quantity - recentAvg) / recentAvg;
+
+      if (deviation > 0.5) { // 50% deviation
+        anomalies.push({
+          type: log.quantity > recentAvg ? 'excessive_consumption' : 'unusual_low_consumption',
+          equipment: log.equipment,
+          date: log.date,
+          quantity: log.quantity,
+          expected: recentAvg.toFixed(1),
+          deviation: (deviation * 100).toFixed(1) + '%',
+          severity: deviation > 1.0 ? 'high' : 'medium'
+        });
+      }
+    });
+
+    // Check for potential theft (very low fuel with no corresponding trip)
+    const recentLogs = sortedLogs.slice(-5);
+    recentLogs.forEach((log) => {
+      if (log.quantity < avgConsumption * 0.3) { // Less than 30% of average
+        anomalies.push({
+          type: 'potential_theft',
+          equipment: log.equipment,
+          date: log.date,
+          quantity: log.quantity,
+          average: avgConsumption.toFixed(1),
+          severity: 'high'
+        });
+      }
+    });
+  }
+
+  return anomalies;
+}
+
+export async function getFuelEfficiencyOptimization() {
+  // Get fuel efficiency metrics
+  const { data: metrics, error } = await supabase
+    .from('fuel_efficiency_metrics')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag,
+        type
+      )
+    `)
+    .order('date', { ascending: false });
+
+  if (error) throw error;
+
+  const recommendations = [];
+
+  // Group by equipment
+  const equipmentMetrics = new Map();
+  metrics.forEach((metric: any) => {
+    if (!equipmentMetrics.has(metric.equipment_id)) {
+      equipmentMetrics.set(metric.equipment_id, []);
+    }
+    equipmentMetrics.get(metric.equipment_id).push(metric);
+  });
+
+  // Analyze each equipment
+  for (const [eqId, eqMetrics] of equipmentMetrics) {
+    if (eqMetrics.length < 7) continue; // Need at least a week of data
+
+    const sortedMetrics = eqMetrics.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const latest = sortedMetrics[sortedMetrics.length - 1];
+    const avgMpg = sortedMetrics.reduce((sum, m) => sum + m.mpg, 0) / sortedMetrics.length;
+    const avgIdle = sortedMetrics.reduce((sum, m) => sum + m.idle_time_hours, 0) / sortedMetrics.length;
+
+    // MPG recommendations
+    if (latest.mpg < avgMpg * 0.8) {
+      recommendations.push({
+        type: 'low_efficiency',
+        equipment: latest.equipment,
+        currentMpg: latest.mpg,
+        averageMpg: avgMpg.toFixed(1),
+        improvement: ((avgMpg - latest.mpg) / latest.mpg * 100).toFixed(1) + '%',
+        suggestions: [
+          'Check tire pressure',
+          'Reduce idling time',
+          'Maintain steady speeds',
+          'Schedule maintenance check'
+        ]
+      });
+    }
+
+    // Idling recommendations
+    if (latest.idle_time_hours > avgIdle * 1.5) {
+      recommendations.push({
+        type: 'excessive_idling',
+        equipment: latest.equipment,
+        idleHours: latest.idle_time_hours,
+        averageIdle: avgIdle.toFixed(1),
+        costImpact: (latest.idle_fuel_wasted * latest.unit_cost || 0).toFixed(2),
+        suggestions: [
+          'Turn off engine when not in use',
+          'Use auxiliary power units',
+          'Implement idling policies',
+          'Install automatic engine shutdown'
+        ]
+      });
+    }
+  }
+
+  return recommendations;
+}
+
+export async function getFuelStationOptimization() {
+  // Get recent fuel logs with location data (assuming GPS integration)
+  const { data: fuelLogs, error } = await supabase
+    .from('fuel_logs')
+    .select(`
+      *,
+      equipment:equipment_id (
+        asset_tag
+      )
+    `)
+    .order('date', { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+
+  // Mock fuel station data (in real implementation, this would come from external API)
+  const fuelStations = [
+    { name: 'Station A', price: 3.45, lat: 40.7128, lng: -74.0060 },
+    { name: 'Station B', price: 3.52, lat: 40.7589, lng: -73.9851 },
+    { name: 'Station C', price: 3.38, lat: 40.7505, lng: -73.9934 },
+  ];
+
+  // For now, return mock optimization data
+  return {
+    recommendations: fuelStations.sort((a, b) => a.price - b.price),
+    savings: fuelLogs.length * 0.15, // Mock savings calculation
+    message: 'Based on current fuel prices and usage patterns'
+  };
+}
+export async function getDriverSafetyScores() {
+  // Get all operators with their behavior events from the last 30 days
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const { data: events, error } = await supabase
+    .from('driver_behavior_events')
+    .select(`
+      *,
+      operators:operator_id (
+        id,
+        name
+      )
+    `)
+    .gte('timestamp', thirtyDaysAgo.toISOString());
+
+  if (error) throw error;
+
+  // Calculate safety scores for each operator
+  const operatorScores = new Map();
+
+  events.forEach((event: any) => {
+    const operatorId = event.operator_id;
+    if (!operatorScores.has(operatorId)) {
+      operatorScores.set(operatorId, {
+        operator: event.operators,
+        events: [],
+        score: 100 // Start with perfect score
+      });
+    }
+
+    const operatorData = operatorScores.get(operatorId);
+    operatorData.events.push(event);
+
+    // Deduct points based on severity and event type
+    let deduction = 0;
+    if (event.severity === 'high') {
+      deduction = event.event_type === 'speeding' ? 10 : 8;
+    } else if (event.severity === 'medium') {
+      deduction = event.event_type === 'speeding' ? 5 : 4;
+    } else {
+      deduction = event.event_type === 'speeding' ? 2 : 1;
+    }
+
+    operatorData.score = Math.max(0, operatorData.score - deduction);
+  });
+
+  return Array.from(operatorScores.values()).sort((a, b) => b.score - a.score);
+}
+
+export async function getDriverBehaviorTrends(operatorId?: string, days: number = 30) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  let query = supabase
+    .from('driver_behavior_events')
+    .select('*')
+    .gte('timestamp', startDate.toISOString())
+    .order('timestamp', { ascending: true });
+
+  if (operatorId) {
+    query = query.eq('operator_id', operatorId);
+  }
+
+  const { data: events, error } = await query;
+  if (error) throw error;
+
+  // Group events by date
+  const dailyEvents = new Map();
+
+  events.forEach((event: any) => {
+    const date = new Date(event.timestamp).toISOString().split('T')[0];
+    if (!dailyEvents.has(date)) {
+      dailyEvents.set(date, {
+        date,
+        totalEvents: 0,
+        speeding: 0,
+        harshBraking: 0,
+        rapidAcceleration: 0,
+        idling: 0,
+        harshCornering: 0,
+        score: 100
+      });
+    }
+
+    const day = dailyEvents.get(date);
+    day.totalEvents++;
+    day[event.event_type] = (day[event.event_type] || 0) + 1;
+
+    // Calculate daily score deduction
+    let deduction = 0;
+    if (event.severity === 'high') {
+      deduction = event.event_type === 'speeding' ? 10 : 8;
+    } else if (event.severity === 'medium') {
+      deduction = event.event_type === 'speeding' ? 5 : 4;
+    } else {
+      deduction = event.event_type === 'speeding' ? 2 : 1;
+    }
+    day.score = Math.max(0, day.score - deduction);
+  });
+
+  return Array.from(dailyEvents.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function getPeerComparison(operatorId: string) {
+  const scores = await getDriverSafetyScores();
+  const targetOperator = scores.find(s => s.operator.id === operatorId);
+
+  if (!targetOperator) return null;
+
+  const sortedScores = scores.map(s => s.score).sort((a, b) => b - a);
+  const targetScore = targetOperator.score;
+
+  // Calculate percentile
+  const betterThan = sortedScores.filter(score => score > targetScore).length;
+  const percentile = Math.round((betterThan / sortedScores.length) * 100);
+
+  // Get average and median
+  const average = sortedScores.reduce((a, b) => a + b, 0) / sortedScores.length;
+  const median = sortedScores[Math.floor(sortedScores.length / 2)];
+
+  return {
+    operator: targetOperator,
+    percentile,
+    average: Math.round(average),
+    median,
+    rank: betterThan + 1,
+    totalOperators: sortedScores.length,
+    betterThan,
+    worseThan: sortedScores.length - betterThan - 1
+  };
+}
+

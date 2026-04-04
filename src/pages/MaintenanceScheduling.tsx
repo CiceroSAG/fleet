@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getMaintenanceSchedulesWithUnderMaintenance } from '@/lib/api';
-import { Wrench, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { getMaintenanceSchedulesWithUnderMaintenance, getMaintenanceWorkload, autoAssignMaintenance, checkPartsAvailability, getMaintenanceOptimization } from '@/lib/api';
+import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface MaintenanceSchedule {
   id: string;
@@ -34,9 +35,37 @@ export default function MaintenanceScheduling() {
     type: 'all'
   });
 
-  useEffect(() => {
-    fetchMaintenanceSchedules();
-  }, [filter]);
+  const queryClient = useQueryClient();
+
+  // New queries for optimization features
+  const { data: workload } = useQuery({
+    queryKey: ['maintenanceWorkload'],
+    queryFn: getMaintenanceWorkload
+  });
+
+  const { data: optimization } = useQuery({
+    queryKey: ['maintenanceOptimization'],
+    queryFn: getMaintenanceOptimization
+  });
+
+  // Mutations
+  const autoAssignMutation = useMutation({
+    mutationFn: autoAssignMaintenance,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenanceWorkload'] });
+      fetchMaintenanceSchedules();
+    }
+  });
+
+  const partsCheckMutation = useMutation({
+    mutationFn: checkPartsAvailability,
+    onSuccess: (data) => {
+      // Show parts availability modal or alert
+      alert(`Parts Status: ${data.status.toUpperCase()}\n${data.partsAvailability.map(p =>
+        `${p.part.name}: ${p.available}/${p.required} (${p.status})`
+      ).join('\n')}`);
+    }
+  });
 
   const fetchMaintenanceSchedules = async () => {
     try {
@@ -210,6 +239,77 @@ export default function MaintenanceScheduling() {
         </div>
       </div>
 
+      {/* Maintenance Optimization Recommendations */}
+      {optimization && optimization.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <Zap className="h-5 w-5 mr-2 text-blue-600" />
+            Maintenance Optimization
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {optimization.map((rec: any, index: number) => (
+              <div key={index} className={`p-4 rounded-lg border-l-4 ${
+                rec.priority === 'critical' ? 'border-red-500 bg-red-50' :
+                rec.priority === 'high' ? 'border-orange-500 bg-orange-50' :
+                'border-blue-500 bg-blue-50'
+              }`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {rec.type === 'overdue_maintenance' ? '🚨 Overdue Maintenance' :
+                       rec.type === 'maintenance_due_soon' ? '⏰ Due Soon' :
+                       '👤 Unassigned Tasks'}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {rec.count} item{rec.count !== 1 ? 's' : ''}: {rec.items.slice(0, 3).join(', ')}
+                      {rec.items.length > 3 && ` +${rec.items.length - 3} more`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">{rec.action}</p>
+                  </div>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    rec.priority === 'critical' ? 'bg-red-100 text-red-800' :
+                    rec.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>
+                    {rec.priority}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Technician Workload */}
+      {workload && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <User className="h-5 w-5 mr-2 text-green-600" />
+            Technician Workload
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {workload.map((tech: any) => (
+              <div key={tech.profile.id} className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-gray-900">{tech.profile.email}</h3>
+                  <span className="text-sm text-gray-500">{tech.assignedTasks} tasks</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span>High Priority:</span>
+                    <span className="font-medium text-red-600">{tech.highPriorityTasks}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Est. Hours:</span>
+                    <span className="font-medium">{tech.totalEstimatedHours}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Filters</h3>
@@ -321,7 +421,27 @@ export default function MaintenanceScheduling() {
                         )}
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
+                      {!schedule.assigned_to && schedule.status === 'active' && (
+                        <button
+                          onClick={() => autoAssignMutation.mutate(schedule.id)}
+                          disabled={autoAssignMutation.isPending}
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                        >
+                          <User className="h-3 w-3 mr-1" />
+                          {autoAssignMutation.isPending ? 'Assigning...' : 'Auto Assign'}
+                        </button>
+                      )}
+                      {schedule.status === 'active' && (
+                        <button
+                          onClick={() => partsCheckMutation.mutate(schedule.id)}
+                          disabled={partsCheckMutation.isPending}
+                          className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 disabled:opacity-50 flex items-center"
+                        >
+                          <Package className="h-3 w-3 mr-1" />
+                          {partsCheckMutation.isPending ? 'Checking...' : 'Check Parts'}
+                        </button>
+                      )}
                       {schedule.status === 'active' && (
                         <button
                           onClick={() => updateScheduleStatus(schedule.id, 'completed')}

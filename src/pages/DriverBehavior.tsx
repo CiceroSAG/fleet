@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { AlertTriangle, TrendingUp, Users, Clock, Plus } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Users, Clock, Plus, Award, BarChart3, Target, TrendingDown } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { createDriverBehaviorEvent, checkDriverBehaviorForHOSViolations, getOperators, getEquipment } from '@/lib/api';
+import { createDriverBehaviorEvent, checkDriverBehaviorForHOSViolations, getOperators, getEquipment, getDriverSafetyScores, getDriverBehaviorTrends, getPeerComparison } from '@/lib/api';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 interface DriverBehaviorEvent {
   id: string;
@@ -26,18 +27,34 @@ export default function DriverBehavior() {
   const [events, setEvents] = useState<DriverBehaviorEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
   const [filter, setFilter] = useState({
     eventType: 'all',
     severity: 'all',
     dateRange: '7' // days
   });
-  useEffect(() => {
-    fetchDriverBehaviorEvents();
-  }, [filter]);
 
   const queryClient = useQueryClient();
   const { data: operators } = useQuery({ queryKey: ['operators'], queryFn: getOperators });
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
+
+  // Analytics queries
+  const { data: safetyScores } = useQuery({
+    queryKey: ['driverSafetyScores'],
+    queryFn: getDriverSafetyScores
+  });
+
+  const { data: behaviorTrends } = useQuery({
+    queryKey: ['driverBehaviorTrends', selectedOperator, 30],
+    queryFn: () => getDriverBehaviorTrends(selectedOperator || undefined, 30),
+    enabled: !!selectedOperator
+  });
+
+  const { data: peerComparison } = useQuery({
+    queryKey: ['peerComparison', selectedOperator],
+    queryFn: () => getPeerComparison(selectedOperator!),
+    enabled: !!selectedOperator
+  });
 
   const createEventMutation = useMutation({
     mutationFn: createDriverBehaviorEvent,
@@ -223,6 +240,121 @@ export default function DriverBehavior() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Analytics Section */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900">Driver Behavior Analytics</h2>
+          <select
+            value={selectedOperator || ''}
+            onChange={(e) => setSelectedOperator(e.target.value || null)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
+          >
+            <option value="">All Operators</option>
+            {operators?.map((op: any) => (
+              <option key={op.id} value={op.id}>{op.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Safety Scores Leaderboard */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <Award className="h-5 w-5 mr-2 text-green-600" />
+              Safety Scores (Last 30 Days)
+            </h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {safetyScores?.slice(0, 10).map((score: any, index: number) => (
+                <div key={score.operator.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 ${
+                      index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                      index === 1 ? 'bg-gray-400 text-gray-900' :
+                      index === 2 ? 'bg-orange-400 text-orange-900' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {index + 1}
+                    </span>
+                    <span className="font-medium text-gray-900">{score.operator.name}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className={`w-16 h-2 rounded-full mr-2 ${
+                      score.score >= 80 ? 'bg-green-500' :
+                      score.score >= 60 ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    }`}>
+                      <div
+                        className="h-full rounded-full bg-current"
+                        style={{ width: `${score.score}%` }}
+                      />
+                    </div>
+                    <span className={`font-bold ${
+                      score.score >= 80 ? 'text-green-600' :
+                      score.score >= 60 ? 'text-yellow-600' :
+                      'text-red-600'
+                    }`}>
+                      {score.score}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Peer Comparison */}
+          {peerComparison && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <Target className="h-5 w-5 mr-2 text-blue-600" />
+                Peer Comparison
+              </h3>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-gray-900">{peerComparison.percentile}th</div>
+                  <div className="text-sm text-gray-600">Percentile Ranking</div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <div className="text-xl font-bold text-blue-600">{peerComparison.rank}</div>
+                    <div className="text-xs text-blue-600">Rank</div>
+                  </div>
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <div className="text-xl font-bold text-green-600">{peerComparison.average}</div>
+                    <div className="text-xs text-green-600">Fleet Average</div>
+                  </div>
+                </div>
+                <div className="text-center text-sm text-gray-600">
+                  Better than {peerComparison.betterThan} of {peerComparison.totalOperators} operators
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Behavior Trends Chart */}
+        {behaviorTrends && behaviorTrends.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <TrendingDown className="h-5 w-5 mr-2 text-purple-600" />
+              30-Day Behavior Trends
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={behaviorTrends}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="speeding" stroke="#ef4444" name="Speeding" />
+                <Line type="monotone" dataKey="harshBraking" stroke="#f97316" name="Harsh Braking" />
+                <Line type="monotone" dataKey="rapidAcceleration" stroke="#eab308" name="Rapid Accel." />
+                <Line type="monotone" dataKey="idling" stroke="#22c55e" name="Idling" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       {/* Filters */}

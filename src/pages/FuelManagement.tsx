@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Fuel, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Fuel, TrendingUp, TrendingDown, DollarSign, AlertTriangle, Lightbulb, MapPin } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
+import { detectFuelAnomalies, getFuelEfficiencyOptimization, getFuelStationOptimization } from '@/lib/api';
 
 interface FuelEfficiencyMetric {
   id: string;
@@ -25,9 +27,21 @@ export default function FuelManagement() {
   const [selectedPeriod, setSelectedPeriod] = useState('30'); // days
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
 
-  useEffect(() => {
-    fetchFuelMetrics();
-  }, [selectedPeriod]);
+  // Smart Alerts queries
+  const { data: fuelAnomalies } = useQuery({
+    queryKey: ['fuelAnomalies'],
+    queryFn: detectFuelAnomalies
+  });
+
+  const { data: efficiencyRecommendations } = useQuery({
+    queryKey: ['fuelEfficiencyOptimization'],
+    queryFn: getFuelEfficiencyOptimization
+  });
+
+  const { data: stationOptimization } = useQuery({
+    queryKey: ['fuelStationOptimization'],
+    queryFn: getFuelStationOptimization
+  });
 
   const fetchFuelMetrics = async () => {
     try {
@@ -150,6 +164,121 @@ export default function FuelManagement() {
           </div>
         </div>
       </div>
+
+      {/* Smart Alerts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Fuel Anomalies */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2 text-red-600" />
+            Fuel Anomalies & Alerts
+          </h2>
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {fuelAnomalies?.length === 0 ? (
+              <p className="text-gray-500 text-sm">No anomalies detected</p>
+            ) : (
+              fuelAnomalies?.map((anomaly: any, index: number) => (
+                <div key={index} className={`p-3 rounded-lg border-l-4 ${
+                  anomaly.severity === 'high' ? 'border-red-500 bg-red-50' : 'border-yellow-500 bg-yellow-50'
+                }`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {anomaly.type === 'potential_theft' ? '🚨 Potential Fuel Theft' :
+                         anomaly.type === 'excessive_consumption' ? '⚠️ Excessive Consumption' :
+                         '📉 Unusual Low Consumption'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {anomaly.equipment.asset_tag} - {new Date(anomaly.date).toLocaleDateString()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {anomaly.quantity} gal (Expected: {anomaly.expected} gal, Deviation: {anomaly.deviation})
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      anomaly.severity === 'high' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {anomaly.severity}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Efficiency Recommendations */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <Lightbulb className="h-5 w-5 mr-2 text-yellow-600" />
+            Efficiency Recommendations
+          </h2>
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {efficiencyRecommendations?.length === 0 ? (
+              <p className="text-gray-500 text-sm">All equipment performing optimally</p>
+            ) : (
+              efficiencyRecommendations?.map((rec: any, index: number) => (
+                <div key={index} className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {rec.type === 'low_efficiency' ? '🚗 Low Fuel Efficiency' : '⏸️ Excessive Idling'}
+                      </p>
+                      <p className="text-sm text-gray-600">{rec.equipment.asset_tag}</p>
+                      {rec.type === 'low_efficiency' ? (
+                        <p className="text-xs text-gray-500">
+                          Current: {rec.currentMpg} MPG (Avg: {rec.averageMpg} MPG, {rec.improvement} below average)
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          Idle: {rec.idleHours}h (Avg: {rec.averageIdle}h, Cost: ${rec.costImpact})
+                        </p>
+                      )}
+                      <ul className="text-xs text-blue-700 mt-1 list-disc list-inside">
+                        {rec.suggestions.map((suggestion: string, i: number) => (
+                          <li key={i}>{suggestion}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Fuel Station Optimization */}
+      {stationOptimization && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <MapPin className="h-5 w-5 mr-2 text-green-600" />
+            Fuel Station Optimization
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {stationOptimization.recommendations.slice(0, 3).map((station: any, index: number) => (
+              <div key={index} className={`p-4 rounded-lg border-2 ${
+                index === 0 ? 'border-green-500 bg-green-50' : 'border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-900">{station.name}</h3>
+                    <p className="text-2xl font-bold text-green-600">${station.price}/gal</p>
+                  </div>
+                  {index === 0 && (
+                    <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                      Best Price
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-gray-600">
+            {stationOptimization.message} - Potential savings: <span className="font-semibold text-green-600">${stationOptimization.savings.toFixed(2)}</span> on recent fuel purchases
+          </p>
+        </div>
+      )}
 
       {/* Statistics Cards */}
       {stats && (

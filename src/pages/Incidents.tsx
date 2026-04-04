@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getIncidents, deleteIncident } from '@/lib/api';
-import { Plus, Search, Edit2, Trash2 } from 'lucide-react';
+import { getIncidents, deleteIncident, getIncidentPatterns, getCorrectiveActions, createIncidentInvestigation } from '@/lib/api';
+import { Plus, Search, Edit2, Trash2, FileText, TrendingUp, AlertTriangle } from 'lucide-react';
 import IncidentForm from '@/components/IncidentForm';
 import { useAuth } from '@/lib/auth';
 
@@ -9,7 +9,14 @@ export default function Incidents() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [investigatingIncident, setInvestigatingIncident] = useState<any>(null);
+  const [showPatterns, setShowPatterns] = useState(false);
+  const [investigationForm, setInvestigationForm] = useState({
+    rootCause: '',
+    contributingFactors: '',
+    preventiveMeasures: ''
+  });
+
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   // Operators can insert, Admins/Managers can edit/delete
@@ -20,10 +27,34 @@ export default function Incidents() {
     queryFn: getIncidents
   });
 
+  // Investigation queries
+  const { data: patterns } = useQuery({
+    queryKey: ['incidentPatterns', '30'],
+    queryFn: () => getIncidentPatterns('30'),
+    enabled: showPatterns
+  });
+
+  const { data: correctiveActions } = useQuery({
+    queryKey: ['correctiveActions', investigatingIncident?.id],
+    queryFn: () => getCorrectiveActions(investigatingIncident.id),
+    enabled: !!investigatingIncident,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incidents'] });
+    }
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteIncident,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
+    }
+  });
+
+  const investigationMutation = useMutation({
+    mutationFn: createIncidentInvestigation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incidents'] });
+      closeInvestigation();
     }
   });
 
@@ -41,6 +72,27 @@ export default function Incidents() {
   const closeForm = () => {
     setEditingLog(null);
     setIsFormOpen(false);
+  };
+
+  const startInvestigation = (incident: any) => {
+    setInvestigatingIncident(incident);
+  };
+
+  const closeInvestigation = () => {
+    setInvestigatingIncident(null);
+    setInvestigationForm({
+      rootCause: '',
+      contributingFactors: '',
+      preventiveMeasures: ''
+    });
+  };
+
+  const handleInvestigationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    investigationMutation.mutate({
+      incidentId: investigatingIncident.id,
+      ...investigationForm
+    });
   };
 
   const filteredLogs = logs?.filter((item: any) => 
@@ -137,6 +189,13 @@ export default function Incidents() {
                     {canEditDelete && (
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                         <button
+                          onClick={() => startInvestigation(item)}
+                          className="text-blue-600 hover:text-blue-900 mr-4"
+                        >
+                          <Search className="h-4 w-4" />
+                          <span className="sr-only">Investigate</span>
+                        </button>
+                        <button
                           onClick={() => openEditForm(item)}
                           className="text-indigo-600 hover:text-indigo-900 mr-4"
                         >
@@ -158,6 +217,182 @@ export default function Incidents() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Investigation Workflow */}
+      {investigatingIncident && correctiveActions && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-blue-600" />
+              Incident Investigation: {investigatingIncident.equipment?.asset_tag}
+            </h2>
+            <button
+              onClick={() => setInvestigatingIncident(null)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Corrective Actions</h3>
+              <div className="space-y-3">
+                {correctiveActions.recommendations.map((rec: any, index: number) => (
+                  <div key={index} className={`p-3 rounded-lg border-l-4 ${
+                    rec.priority === 'critical' ? 'border-red-500 bg-red-50' :
+                    rec.priority === 'high' ? 'border-orange-500 bg-orange-50' :
+                    'border-blue-500 bg-blue-50'
+                  }`}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{rec.action}</p>
+                        <p className="text-sm text-gray-600">{rec.department}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        rec.priority === 'critical' ? 'bg-red-100 text-red-800' :
+                        rec.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {rec.priority}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Investigation Form</h3>
+              <form onSubmit={handleInvestigationSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Root Cause</label>
+                  <textarea
+                    value={investigationForm.rootCause}
+                    onChange={(e) => setInvestigationForm(prev => ({ ...prev, rootCause: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
+                    rows={3}
+                    placeholder="Describe the root cause of this incident..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Contributing Factors</label>
+                  <textarea
+                    value={investigationForm.contributingFactors}
+                    onChange={(e) => setInvestigationForm(prev => ({ ...prev, contributingFactors: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
+                    rows={2}
+                    placeholder="List any contributing factors..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Preventive Measures</label>
+                  <textarea
+                    value={investigationForm.preventiveMeasures}
+                    onChange={(e) => setInvestigationForm(prev => ({ ...prev, preventiveMeasures: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
+                    rows={2}
+                    placeholder="Recommended preventive measures..."
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={investigationMutation.isPending}
+                  className="w-full bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {investigationMutation.isPending ? 'Submitting...' : 'Complete Investigation'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Incident Patterns Analysis */}
+      {showPatterns && patterns && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
+              Incident Patterns (Last 30 Days)
+            </h2>
+            <button
+              onClick={() => setShowPatterns(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900">By Type</h3>
+              <div className="mt-2 space-y-1">
+                {Object.entries(patterns.byType).map(([type, count]) => (
+                  <div key={type} className="flex justify-between text-sm">
+                    <span>{type}:</span>
+                    <span className="font-medium">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900">By Severity</h3>
+              <div className="mt-2 space-y-1">
+                {Object.entries(patterns.bySeverity).map(([severity, count]) => (
+                  <div key={severity} className="flex justify-between text-sm">
+                    <span className={`capitalize ${
+                      severity === 'High' ? 'text-red-600' :
+                      severity === 'Medium' ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>{severity}:</span>
+                    <span className="font-medium">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900">Top Equipment</h3>
+              <div className="mt-2 space-y-1">
+                {Object.entries(patterns.byEquipment).slice(0, 3).map(([equipment, count]) => (
+                  <div key={equipment} className="flex justify-between text-sm">
+                    <span className="truncate mr-2">{equipment}:</span>
+                    <span className="font-medium">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900">Trend</h3>
+              <div className="mt-2">
+                {patterns.trends.map((trend: any, index: number) => (
+                  <div key={index} className="text-sm">
+                    <p className="font-medium">{trend.period}</p>
+                    <p className={`${trend.trend === 'increasing' ? 'text-red-600' : trend.trend === 'decreasing' ? 'text-green-600' : 'text-gray-600'}`}>
+                      {trend.incidents} incidents ({trend.change}% {trend.trend})
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex justify-between items-center">
+        <button
+          onClick={() => setShowPatterns(!showPatterns)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+        >
+          <TrendingUp className="h-4 w-4 mr-2" />
+          {showPatterns ? 'Hide Patterns' : 'Show Patterns'}
+        </button>
       </div>
 
       {isFormOpen && (
