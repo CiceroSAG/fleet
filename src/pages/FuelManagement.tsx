@@ -30,7 +30,7 @@ export default function FuelManagement() {
   // Smart Alerts queries
   const { data: fuelAnomalies } = useQuery({
     queryKey: ['fuelAnomalies'],
-    queryFn: detectFuelAnomalies
+    queryFn: () => detectFuelAnomalies()
   });
 
   const { data: efficiencyRecommendations } = useQuery({

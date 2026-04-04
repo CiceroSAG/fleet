@@ -34,13 +34,10 @@ export default function Incidents() {
     enabled: showPatterns
   });
 
-  const { data: correctiveActions } = useQuery({
+  const { data: correctiveActions, error: investigationError } = useQuery({
     queryKey: ['correctiveActions', investigatingIncident?.id],
     queryFn: () => getCorrectiveActions(investigatingIncident.id),
-    enabled: !!investigatingIncident,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['incidents'] });
-    }
+    enabled: !!investigatingIncident
   });
 
   const deleteMutation = useMutation({
@@ -51,7 +48,8 @@ export default function Incidents() {
   });
 
   const investigationMutation = useMutation({
-    mutationFn: createIncidentInvestigation,
+    mutationFn: ({ incidentId, investigation }: { incidentId: string; investigation: any }) => 
+      createIncidentInvestigation(incidentId, investigation),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
       closeInvestigation();
@@ -91,7 +89,7 @@ export default function Incidents() {
     e.preventDefault();
     investigationMutation.mutate({
       incidentId: investigatingIncident.id,
-      ...investigationForm
+      investigation: investigationForm
     });
   };
 
@@ -99,6 +97,26 @@ export default function Incidents() {
     item.equipment?.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.type_of_damage.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400" />
+        <h3 className="mt-2 text-sm font-medium text-gray-900">Error loading incidents</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          There was an error loading the incident data. Please check your database connection and ensure all required tables exist.
+        </p>
+        <div className="mt-6">
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -220,7 +238,7 @@ export default function Incidents() {
       </div>
 
       {/* Investigation Workflow */}
-      {investigatingIncident && correctiveActions && (
+      {investigatingIncident && correctiveActions && !investigationError && (
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900 flex items-center">
@@ -305,6 +323,27 @@ export default function Incidents() {
                   {investigationMutation.isPending ? 'Submitting...' : 'Complete Investigation'}
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Investigation Error */}
+      {investigatingIncident && investigationError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Investigation Error</h3>
+              <p className="mt-1 text-sm text-red-700">
+                Unable to load corrective actions. This feature requires database schema updates.
+              </p>
+              <button
+                onClick={() => setInvestigatingIncident(null)}
+                className="mt-2 text-sm text-red-600 hover:text-red-800"
+              >
+                Close Investigation
+              </button>
             </div>
           </div>
         </div>

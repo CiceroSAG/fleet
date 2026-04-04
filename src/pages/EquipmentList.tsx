@@ -29,6 +29,13 @@ export default function EquipmentList() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteEquipment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    }
+  });
+
   const handleStatusChange = (id: string, status: string) => {
     updateStatusMutation.mutate({ id, status });
   };

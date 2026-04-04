@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getMaintenanceSchedulesWithUnderMaintenance, getMaintenanceWorkload, autoAssignMaintenance, checkPartsAvailability, getMaintenanceOptimization } from '@/lib/api';
 import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 
 interface MaintenanceSchedule {
   id: string;
