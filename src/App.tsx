@@ -71,13 +71,15 @@ export default function App() {
               <Route path="maintenance" element={<Maintenance />} />
               <Route path="repairs" element={<Repairs />} />
               <Route path="incidents" element={<Incidents />} />
-              <Route path="settings" element={<Settings />} />            <Route path="tracking" element={<RealTimeTracking />} />
-            <Route path="driver-behavior" element={<DriverBehavior />} />
-            <Route path="fuel-management" element={<FuelManagement />} />
-            <Route path="maintenance-scheduling" element={<MaintenanceScheduling />} />
-            <Route path="compliance" element={<ComplianceManagement />} />
-            <Route path="utilization" element={<AssetUtilization />} />
-            <Route path="reports" element={<Reports />} />            </Route>
+              <Route path="settings" element={<Settings />} />
+              <Route path="tracking" element={<RealTimeTracking />} />
+              <Route path="driver-behavior" element={<DriverBehavior />} />
+              <Route path="fuel-management" element={<FuelManagement />} />
+              <Route path="maintenance-scheduling" element={<MaintenanceScheduling />} />
+              <Route path="compliance" element={<ComplianceManagement />} />
+              <Route path="utilization" element={<AssetUtilization />} />
+              <Route path="reports" element={<Reports />} />
+            </Route>
           </Routes>
         </BrowserRouter>
       </AuthProvider>

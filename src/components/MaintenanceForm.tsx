@@ -1,21 +1,7 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { createMaintenanceLog, updateMaintenanceLog, getEquipment, getSettings } from '@/lib/api';
-import { X } from 'lucide-react';
-import { getCurrencySymbol } from '@/lib/utils';
-
-const maintenanceSchema = z.object({
-  equipment_id: z.string().uuid('Equipment is required'),
-  service_type: z.enum(['routine', 'major', 'emergency']),
-  date: z.string().min(1, 'Date is required'),
-  cost: z.coerce.number().min(0, 'Cost must be 0 or greater'),
-  notes: z.string().optional(),
-});
-
-type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getEquipment, createMaintenanceLog, updateMaintenanceLog } from '../lib/api';
+import { X, Save, AlertCircle } from 'lucide-react';
 
 interface MaintenanceFormProps {
   log?: any;
@@ -25,140 +11,198 @@ interface MaintenanceFormProps {
 export default function MaintenanceForm({ log, onClose }: MaintenanceFormProps) {
   const queryClient = useQueryClient();
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
-  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings });
-  const currencySymbol = getCurrencySymbol(settings?.currency);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<MaintenanceFormData>({
-    resolver: zodResolver(maintenanceSchema) as any,
-    defaultValues: {
-      equipment_id: log?.equipment_id || '',
-      service_type: log?.service_type || 'routine',
-      date: log?.date ? new Date(log.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
-      cost: log?.cost || 0,
-      notes: log?.notes || '',
-    }
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    equipment_id: '',
+    service_type: 'routine',
+    date: new Date().toISOString().split('T')[0],
+    cost: '',
+    odometer_reading: '',
+    description: '',
+    status: 'completed',
   });
 
-  const createMutation = useMutation({
-    mutationFn: createMaintenanceLog,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenanceLogs'] });
-      onClose();
-    }
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: MaintenanceFormData) => updateMaintenanceLog(log.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenanceLogs'] });
-      onClose();
-    }
-  });
-
-  const onSubmit = (data: MaintenanceFormData) => {
-    const payload = {
-      ...data,
-      date: new Date(data.date).toISOString()
-    };
-
+  useEffect(() => {
     if (log) {
-      updateMutation.mutate(payload);
-    } else {
-      createMutation.mutate(payload);
+      setFormData({
+        equipment_id: log.equipment_id || '',
+        service_type: log.service_type || 'routine',
+        date: log.date ? new Date(log.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        cost: log.cost?.toString() || '',
+        odometer_reading: log.odometer_reading?.toString() || '',
+        description: log.description || '',
+        status: log.status || 'completed',
+      });
     }
+  }, [log]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => log ? updateMaintenanceLog(log.id, data) : createMaintenanceLog(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenanceLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      onClose();
+    },
+    onError: (err: any) => {
+      console.error('Error saving maintenance log:', err);
+      setError(err.message || 'Failed to save maintenance log');
+    }
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    mutation.mutate({
+      ...formData,
+      cost: formData.cost ? parseFloat(formData.cost) : 0,
+      odometer_reading: formData.odometer_reading ? parseInt(formData.odometer_reading) : 0,
+    });
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-black/50 p-4">
-      <div className="relative w-full max-w-md rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b p-4">
-          <h3 className="text-xl font-semibold text-gray-900">
-            {log ? 'Edit Maintenance Log' : 'Add Maintenance Log'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="ml-auto inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-gray-400 hover:bg-gray-200 hover:text-gray-900"
-          >
-            <X className="h-5 w-5" />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {log ? 'Edit Maintenance Log' : 'Log New Maintenance'}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6">
-          <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2 text-red-600 text-sm">
+              <AlertCircle className="w-4 h-4" />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Equipment *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Equipment</label>
               <select
-                {...register('equipment_id')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
+                name="equipment_id"
+                value={formData.equipment_id}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               >
                 <option value="">Select Equipment</option>
-                {equipment?.map((eq: any) => (
-                  <option key={eq.id} value={eq.id}>{eq.asset_tag} - {eq.type}</option>
+                {equipment?.map((item: any) => (
+                  <option key={item.id} value={item.id}>{item.asset_tag} - {item.type}</option>
                 ))}
               </select>
-              {errors.equipment_id && <p className="mt-1 text-sm text-red-600">{errors.equipment_id.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+                <select
+                  name="service_type"
+                  value={formData.service_type}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                >
+                  <option value="routine">Routine Service</option>
+                  <option value="inspection">Inspection</option>
+                  <option value="oil_change">Oil Change</option>
+                  <option value="tire_rotation">Tire Rotation</option>
+                  <option value="brake_service">Brake Service</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cost</label>
+                <input
+                  type="number"
+                  name="cost"
+                  value={formData.cost}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  step="0.01"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Odometer Reading</label>
+                <input
+                  type="number"
+                  name="odometer_reading"
+                  value={formData.odometer_reading}
+                  onChange={handleChange}
+                  placeholder="Current km/miles"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Service Type *</label>
-              <select
-                {...register('service_type')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
-              >
-                <option value="routine">Routine</option>
-                <option value="major">Major</option>
-                <option value="emergency">Emergency</option>
-              </select>
-              {errors.service_type && <p className="mt-1 text-sm text-red-600">{errors.service_type.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Date & Time *</label>
-              <input
-                type="datetime-local"
-                {...register('date')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
-              />
-              {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Cost ({currencySymbol}) *</label>
-              <input
-                type="number"
-                step="0.01"
-                {...register('cost')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
-              />
-              {errors.cost && <p className="mt-1 text-sm text-red-600">{errors.cost.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Notes</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
-                {...register('notes')}
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
                 rows={3}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm"
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                placeholder="Describe the work performed..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+              >
+                <option value="scheduled">Scheduled</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3 border-t pt-4">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isPending}
-              className="inline-flex justify-center rounded-md border border-transparent bg-orange-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50"
+              disabled={mutation.isPending}
+              className="flex items-center space-x-2 bg-orange-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50"
             >
-              {isPending ? 'Saving...' : 'Save'}
+              <Save className="w-4 h-4" />
+              <span>{mutation.isPending ? 'Saving...' : 'Save Log'}</span>
             </button>
           </div>
         </form>

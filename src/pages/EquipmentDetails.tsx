@@ -99,6 +99,36 @@ export default function EquipmentDetails() {
               </div>
             </dl>
           </div>
+
+          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+            <h4 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wider">Lifecycle & Warranty</h4>
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Purchase Date</dt>
+                <dd className="mt-1 text-sm text-gray-900">{equipment.purchase_date ? new Date(equipment.purchase_date).toLocaleDateString() : '-'}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Purchase Price</dt>
+                <dd className="mt-1 text-sm text-gray-900">{equipment.purchase_price ? `${currencySymbol}${Number(equipment.purchase_price).toLocaleString()}` : '-'}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Warranty Provider</dt>
+                <dd className="mt-1 text-sm text-gray-900">{equipment.warranty_provider || '-'}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Warranty Expiry</dt>
+                <dd className="mt-1 text-sm text-gray-900">{equipment.warranty_end_date ? new Date(equipment.warranty_end_date).toLocaleDateString() : '-'}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Current Book Value</dt>
+                <dd className="mt-1 text-sm text-gray-900">{equipment.current_book_value ? `${currencySymbol}${Number(equipment.current_book_value).toLocaleString()}` : '-'}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Useful Life</dt>
+                <dd className="mt-1 text-sm text-gray-900">{equipment.useful_life_years ? `${equipment.useful_life_years} Years` : '-'}</dd>
+              </div>
+            </dl>
+          </div>
         </div>
 
         <div className="bg-white shadow rounded-lg p-6">

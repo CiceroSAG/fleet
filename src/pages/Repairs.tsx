@@ -1,175 +1,180 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getRepairLogs, deleteRepairLog, getSettings } from '@/lib/api';
-import { Plus, Search, Edit2, Trash2 } from 'lucide-react';
-import RepairForm from '@/components/RepairForm';
-import { useAuth } from '@/lib/auth';
-import { getCurrencySymbol } from '@/lib/utils';
+import { getRepairLogs, getEquipment, deleteRepairLog } from '../lib/api';
+import { Plus, Search, AlertCircle, Wrench, Clock, CheckCircle2, MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import RepairLogForm from '../components/RepairLogForm';
 
 export default function Repairs() {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingLog, setEditingLog] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
-  const canEditDelete = profile?.role === 'Admin' || profile?.role === 'Manager';
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const { data: logs, isLoading, error } = useQuery({
+  const { data: logs, isLoading } = useQuery({
     queryKey: ['repairLogs'],
-    queryFn: getRepairLogs
+    queryFn: getRepairLogs,
   });
 
-  const { data: settings } = useQuery({
-    queryKey: ['settings'],
-    queryFn: getSettings
+  const { data: equipment } = useQuery({
+    queryKey: ['equipment'],
+    queryFn: getEquipment,
   });
-
-  const currencySymbol = getCurrencySymbol(settings?.currency);
 
   const deleteMutation = useMutation({
     mutationFn: deleteRepairLog,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repairLogs'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      setOpenMenuId(null);
+    },
   });
 
+  const filteredLogs = logs?.filter(log => {
+    const equip = equipment?.find(e => e.id === log.equipment_id);
+    const searchStr = `${equip?.asset_tag} ${log.repair_type} ${log.description}`.toLowerCase();
+    return searchStr.includes(searchTerm.toLowerCase());
+  });
+
+  const handleEdit = (log: any) => {
+    setSelectedLog(log);
+    setIsFormOpen(true);
+    setOpenMenuId(null);
+  };
+
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this log?')) {
+    if (window.confirm('Are you sure you want to delete this repair log?')) {
       deleteMutation.mutate(id);
     }
   };
 
-  const openEditForm = (item: any) => {
-    setEditingLog(item);
-    setIsFormOpen(true);
-  };
-
-  const closeForm = () => {
-    setEditingLog(null);
-    setIsFormOpen(false);
-  };
-
-  const filteredLogs = logs?.filter((item: any) => 
-    item.equipment?.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.issue_description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-[400px]">Loading repair logs...</div>;
+  }
 
   return (
-    <div>
-      <div className="sm:flex sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Repairs</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Track breakdowns, fixes, and repair statuses.
-          </p>
-        </div>
-        {canEditDelete && (
-          <div className="mt-4 sm:mt-0">
-            <button
-              onClick={() => setIsFormOpen(true)}
-              type="button"
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-orange-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 sm:w-auto"
-            >
-              <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-              Log Repair
-            </button>
-          </div>
-        )}
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-gray-900">Repair Logs</h1>
+        <button 
+          onClick={() => {
+            setSelectedLog(null);
+            setIsFormOpen(true);
+          }}
+          className="flex items-center justify-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Log Repair</span>
+        </button>
       </div>
 
-      <div className="bg-white shadow-sm ring-1 ring-gray-300 sm:rounded-lg">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <div className="relative rounded-md shadow-sm max-w-sm w-full">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
-            </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
-              placeholder="Search by asset tag or issue..."
-            />
-          </div>
+      {/* Search */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by asset tag or repair type..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+          />
         </div>
-        
-        {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading logs...</div>
-        ) : error ? (
-          <div className="p-8 text-center text-red-500">
-            <p className="font-medium">Database Connection Error</p>
-            <p className="text-sm mt-1">Please ensure your Supabase URL and Anon Key are set.</p>
-          </div>
-        ) : !filteredLogs || filteredLogs.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No repair logs found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-300">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Date Reported</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Equipment</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Issue</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Cost ({currencySymbol})</th>
-                  {canEditDelete && (
-                    <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {filteredLogs.map((item: any) => (
-                  <tr key={item.id}>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                      {new Date(item.date_reported).toLocaleDateString()}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Repair Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Reported</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredLogs?.map((log) => {
+                const equip = equipment?.find(e => e.id === log.equipment_id);
+                return (
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="bg-red-100 p-2 rounded-lg mr-3">
+                          <AlertCircle className="w-4 h-4 text-red-600" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{equip?.asset_tag || 'Unknown'}</span>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {item.equipment?.asset_tag}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{(log.repair_type || '').replace('_', ' ')}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(log.date_reported).toLocaleDateString()}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-500 max-w-xs truncate">
-                      {item.issue_description}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      ${log.cost?.toLocaleString() || '0'}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
-                        item.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                        item.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 
-                        'bg-gray-100 text-gray-800'
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        log.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        log.status === 'in_progress' ? 'bg-orange-100 text-orange-700' :
+                        'bg-gray-100 text-gray-700'
                       }`}>
-                        {item.status}
+                        {(log.status || '').replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{item.cost ? `${currencySymbol}${item.cost}` : '-'}</td>
-                    {canEditDelete && (
-                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                        <button
-                          onClick={() => openEditForm(item)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-4"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Delete</span>
-                        </button>
-                      </td>
-                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                      <button 
+                        onClick={() => setOpenMenuId(openMenuId === log.id ? null : log.id)}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                      
+                      {openMenuId === log.id && (
+                        <div className="absolute right-6 top-10 w-36 bg-white rounded-lg shadow-lg border border-gray-100 z-10 py-1">
+                          <button
+                            onClick={() => handleEdit(log)}
+                            className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-600" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(log.id)}
+                            className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                );
+              })}
+              {filteredLogs?.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    No repair logs found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {isFormOpen && (
-        <RepairForm log={editingLog} onClose={closeForm} />
+        <RepairLogForm
+          log={selectedLog}
+          onClose={() => {
+            setIsFormOpen(false);
+            setSelectedLog(null);
+          }}
+        />
       )}
     </div>
   );

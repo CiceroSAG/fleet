@@ -6,13 +6,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getCurrencySymbol(currencyCode?: string) {
-  switch (currencyCode) {
-    case 'EUR': return '€';
-    case 'GBP': return '£';
-    case 'ZAR': return 'R';
-    case 'USD':
-    case 'AUD':
-    case 'CAD':
-    default: return '$';
-  }
+  const symbols: Record<string, string> = {
+    USD: '$',
+    EUR: '€',
+    GBP: '£',
+    JPY: '¥',
+    AUD: 'A$',
+    CAD: 'C$',
+    NGN: '₦',
+  };
+  return symbols[currencyCode || 'USD'] || '$';
 }

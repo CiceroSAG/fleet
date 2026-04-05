@@ -1,52 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getEquipment, getOperators, createIncident, updateIncident } from '../lib/api';
+import { getEquipment, createRepairLog, updateRepairLog } from '../lib/api';
 import { X, Save, AlertCircle } from 'lucide-react';
 
-interface IncidentFormProps {
-  incident?: any;
+interface RepairLogFormProps {
+  log?: any;
   onClose: () => void;
 }
 
-export default function IncidentForm({ incident, onClose }: IncidentFormProps) {
+export default function RepairLogForm({ log, onClose }: RepairLogFormProps) {
   const queryClient = useQueryClient();
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
-  const { data: operators } = useQuery({ queryKey: ['operators'], queryFn: getOperators });
 
-  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     equipment_id: '',
-    operator_id: '',
-    date: new Date().toISOString().split('T')[0],
-    type: 'collision',
-    severity: 'minor',
+    repair_type: 'mechanical',
+    date_reported: new Date().toISOString().split('T')[0],
+    cost: 0,
+    status: 'in_progress',
     description: '',
-    location: '',
   });
 
   useEffect(() => {
-    if (incident) {
+    if (log) {
       setFormData({
-        equipment_id: incident.equipment_id || '',
-        operator_id: incident.operator_id || '',
-        date: incident.date ? new Date(incident.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        type: incident.type || 'collision',
-        severity: incident.severity || 'minor',
-        description: incident.description || '',
-        location: incident.location || '',
+        equipment_id: log.equipment_id || '',
+        repair_type: log.repair_type || 'mechanical',
+        date_reported: log.date_reported ? new Date(log.date_reported).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        cost: log.cost || 0,
+        status: log.status || 'in_progress',
+        description: log.description || '',
       });
     }
-  }, [incident]);
+  }, [log]);
+
+  const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => incident ? updateIncident(incident.id, data) : createIncident(data),
+    mutationFn: (data: any) => log ? updateRepairLog(log.id, data) : createRepairLog(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['incidents'] });
+      queryClient.invalidateQueries({ queryKey: ['repairLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
       onClose();
     },
     onError: (err: any) => {
-      console.error('Error saving incident report:', err);
-      setError(err.message || 'Failed to save incident report');
+      console.error('Error saving repair log:', err);
+      setError(err.message || 'Failed to save repair log');
     }
   });
 
@@ -60,7 +59,7 @@ export default function IncidentForm({ incident, onClose }: IncidentFormProps) {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: name === 'cost' ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -69,7 +68,7 @@ export default function IncidentForm({ incident, onClose }: IncidentFormProps) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-900">
-            {incident ? 'Edit Incident Report' : 'Report New Incident'}
+            {log ? 'Edit Repair Log' : 'New Repair Log'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
@@ -84,92 +83,76 @@ export default function IncidentForm({ incident, onClose }: IncidentFormProps) {
             </div>
           )}
           <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Equipment</label>
+              <select
+                name="equipment_id"
+                value={formData.equipment_id}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+              >
+                <option value="">Select Equipment</option>
+                {equipment?.map((item: any) => (
+                  <option key={item.id} value={item.id}>
+                    {item.asset_tag} - {item.type}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Equipment</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Repair Type</label>
                 <select
-                  name="equipment_id"
-                  value={formData.equipment_id}
+                  name="repair_type"
+                  value={formData.repair_type}
                   onChange={handleChange}
-                  required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 >
-                  <option value="">Select Equipment</option>
-                  {equipment?.map((item: any) => (
-                    <option key={item.id} value={item.id}>{item.asset_tag} - {item.type}</option>
-                  ))}
+                  <option value="mechanical">Mechanical</option>
+                  <option value="electrical">Electrical</option>
+                  <option value="hydraulic">Hydraulic</option>
+                  <option value="body">Body Work</option>
+                  <option value="tires">Tires</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Operator Involved</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
-                  name="operator_id"
-                  value={formData.operator_id}
+                  name="status"
+                  value={formData.status}
                   onChange={handleChange}
-                  required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 >
-                  <option value="">Select Operator</option>
-                  {operators?.map((op: any) => (
-                    <option key={op.id} value={op.id}>{op.name}</option>
-                  ))}
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date Reported</label>
                 <input
                   type="date"
-                  name="date"
-                  value={formData.date}
+                  name="date_reported"
+                  value={formData.date_reported}
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Incident Type</label>
-                <select
-                  name="type"
-                  value={formData.type}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                >
-                  <option value="collision">Collision</option>
-                  <option value="breakdown">Breakdown</option>
-                  <option value="theft">Theft/Vandalism</option>
-                  <option value="injury">Personal Injury</option>
-                  <option value="spill">Environmental Spill</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Severity</label>
-                <select
-                  name="severity"
-                  value={formData.severity}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                >
-                  <option value="minor">Minor</option>
-                  <option value="moderate">Moderate</option>
-                  <option value="major">Major</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Cost</label>
                 <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
+                  type="number"
+                  name="cost"
+                  value={formData.cost}
                   onChange={handleChange}
-                  placeholder="e.g. Site B, North Gate"
+                  step="0.01"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 />
               </div>
@@ -182,9 +165,8 @@ export default function IncidentForm({ incident, onClose }: IncidentFormProps) {
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
-                required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
-                placeholder="Describe what happened..."
+                placeholder="Describe the issue or repair needed..."
               />
             </div>
           </div>
@@ -203,7 +185,7 @@ export default function IncidentForm({ incident, onClose }: IncidentFormProps) {
               className="flex items-center space-x-2 bg-orange-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              <span>{mutation.isPending ? 'Reporting...' : 'Save Report'}</span>
+              <span>{mutation.isPending ? 'Saving...' : 'Save Repair Log'}</span>
             </button>
           </div>
         </form>

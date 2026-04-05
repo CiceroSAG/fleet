@@ -191,7 +191,10 @@ export async function createOperator(operator: any) {
     .from('operators')
     .insert([operator])
     .select();
-  if (error) throw error;
+  if (error) {
+    console.error('Supabase error creating operator:', error);
+    throw error;
+  }
   return data[0];
 }
 
@@ -204,7 +207,10 @@ export async function updateOperator(id: string, operator: any) {
     .update(operator)
     .eq('id', id)
     .select();
-  if (error) throw error;
+  if (error) {
+    console.error('Supabase error updating operator:', error);
+    throw error;
+  }
   return data[0];
 }
 
@@ -352,6 +358,7 @@ export async function getMaintenanceLogs() {
 }
 
 export async function createMaintenanceLog(log: any) {
+  console.log('Creating maintenance log:', log);
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
     return { id: Math.random().toString(36).substring(7), ...log };
   }
@@ -359,11 +366,33 @@ export async function createMaintenanceLog(log: any) {
     .from('maintenance_logs')
     .insert([log])
     .select();
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Supabase error creating maintenance log:', error);
+    throw error;
+  }
 
-  // Update maintenance schedule after creating log
+  console.log('Maintenance log created successfully:', data[0]);
+
+  // Update maintenance schedule and equipment status after creating log
   if (data && data[0]) {
-    await updateMaintenanceScheduleFromLog(data[0].id);
+    try {
+      await updateMaintenanceScheduleFromLog(data[0].id);
+      
+      // Sync Equipment Status
+      let newEquipmentStatus = 'Active';
+      if (log.status === 'scheduled' || log.status === 'in_progress') {
+        newEquipmentStatus = 'Under Maintenance';
+      }
+      
+      await supabase
+        .from('equipment')
+        .update({ status: newEquipmentStatus })
+        .eq('id', log.equipment_id);
+        
+    } catch (scheduleError) {
+      console.error('Error updating maintenance schedule or equipment status from log:', scheduleError);
+    }
   }
 
   return data[0];
@@ -379,6 +408,24 @@ export async function updateMaintenanceLog(id: string, log: any) {
     .eq('id', id)
     .select();
   if (error) throw error;
+  
+  // Sync Equipment Status
+  if (data && data[0]) {
+    try {
+      let newEquipmentStatus = 'Active';
+      if (log.status === 'scheduled' || log.status === 'in_progress') {
+        newEquipmentStatus = 'Under Maintenance';
+      }
+      
+      await supabase
+        .from('equipment')
+        .update({ status: newEquipmentStatus })
+        .eq('id', log.equipment_id || data[0].equipment_id);
+    } catch (err) {
+      console.error('Error updating equipment status from maintenance log:', err);
+    }
+  }
+  
   return data[0];
 }
 
@@ -413,6 +460,7 @@ export async function getRepairLogs() {
 }
 
 export async function createRepairLog(log: any) {
+  console.log('Creating repair log:', log);
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
     return { id: Math.random().toString(36).substring(7), ...log };
   }
@@ -420,11 +468,36 @@ export async function createRepairLog(log: any) {
     .from('repair_logs')
     .insert([log])
     .select();
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Supabase error creating repair log:', error);
+    throw error;
+  }
+  
+  console.log('Repair log created successfully:', data[0]);
+  
+  // Sync Equipment Status
+  if (data && data[0]) {
+    try {
+      let newEquipmentStatus = 'Active';
+      if (log.status === 'Pending' || log.status === 'In Progress') {
+        newEquipmentStatus = 'Repair Required';
+      }
+      
+      await supabase
+        .from('equipment')
+        .update({ status: newEquipmentStatus })
+        .eq('id', log.equipment_id);
+    } catch (err) {
+      console.error('Error updating equipment status from repair log:', err);
+    }
+  }
+  
   return data[0];
 }
 
 export async function updateRepairLog(id: string, log: any) {
+  console.log('Updating repair log:', id, log);
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
     return { id, ...log };
   }
@@ -433,7 +506,31 @@ export async function updateRepairLog(id: string, log: any) {
     .update(log)
     .eq('id', id)
     .select();
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Supabase error updating repair log:', error, 'ID:', id);
+    throw error;
+  }
+  
+  console.log('Repair log updated successfully:', data[0]);
+  
+  // Sync Equipment Status
+  if (data && data[0]) {
+    try {
+      let newEquipmentStatus = 'Active';
+      if (log.status === 'Pending' || log.status === 'In Progress') {
+        newEquipmentStatus = 'Repair Required';
+      }
+      
+      await supabase
+        .from('equipment')
+        .update({ status: newEquipmentStatus })
+        .eq('id', log.equipment_id || data[0].equipment_id);
+    } catch (err) {
+      console.error('Error updating equipment status from repair log:', err);
+    }
+  }
+  
   return data[0];
 }
 
@@ -469,6 +566,7 @@ export async function getIncidents() {
 }
 
 export async function createIncident(incident: any) {
+  console.log('Creating incident report:', incident);
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
     return { id: Math.random().toString(36).substring(7), ...incident };
   }
@@ -476,19 +574,29 @@ export async function createIncident(incident: any) {
     .from('incidents')
     .insert([incident])
     .select();
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Supabase error creating incident report:', error);
+    throw error;
+  }
+
+  console.log('Incident report created successfully:', data[0]);
 
   // Create notification for admins about new incident
-  const admins = await getAdminProfiles();
-  for (const admin of admins) {
-    await createNotification({
-      user_id: admin.id,
-      type: 'incident',
-      title: 'New Incident Reported',
-      message: `A new incident has been reported for equipment ${incident.equipment_id}`,
-      related_id: data[0].id,
-      related_table: 'incidents'
-    });
+  try {
+    const admins = await getAdminProfiles();
+    for (const admin of admins) {
+      await createNotification({
+        user_id: admin.id,
+        type: 'incident',
+        title: 'New Incident Reported',
+        message: `A new incident has been reported for equipment ${incident.equipment_id}`,
+        related_id: data[0].id,
+        related_table: 'incidents'
+      });
+    }
+  } catch (notifError) {
+    console.error('Error creating notifications for incident:', notifError);
   }
 
   return data[0];
@@ -636,7 +744,10 @@ export async function createDriverBehaviorEvent(event: any) {
     .from('driver_behavior_events')
     .insert([event])
     .select();
-  if (error) throw error;
+  if (error) {
+    console.error('Supabase error creating driver behavior event:', error);
+    throw error;
+  }
   return data[0];
 }
 

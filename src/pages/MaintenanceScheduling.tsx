@@ -396,10 +396,10 @@ export default function MaintenanceScheduling() {
                             {schedule.description}
                           </h4>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(schedule.status)}`}>
-                            {schedule.status.toUpperCase()}
+                            {(schedule.status || '').toUpperCase()}
                           </span>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(schedule.priority)}`}>
-                            {schedule.priority.toUpperCase()}
+                            {(schedule.priority || '').toUpperCase()}
                           </span>
                           {isOverdue(schedule.next_due) && schedule.status === 'active' && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-red-600 bg-red-100">

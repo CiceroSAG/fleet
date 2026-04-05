@@ -48,7 +48,12 @@ CREATE TABLE operators (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   license_type TEXT,
+  license_number TEXT,
+  license_expiry DATE,
   contact TEXT,
+  phone TEXT,
+  email TEXT,
+  status TEXT DEFAULT 'Active',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -62,9 +67,12 @@ CREATE TABLE equipment (
   serial_number TEXT,
   license_plate TEXT, -- Added for vehicles
   vin TEXT, -- Added for vehicles
+  category_id UUID REFERENCES equipment_categories(id),
   assigned_operator_id UUID REFERENCES operators(id),
   current_location TEXT,
   status TEXT NOT NULL DEFAULT 'Active', -- Active, Under Maintenance, Out of Service, Damaged
+  odometer NUMERIC DEFAULT 0,
+  engine_hours NUMERIC DEFAULT 0,
   -- Warranty and Lifecycle fields
   purchase_date DATE,
   purchase_price DECIMAL(10, 2),
@@ -147,6 +155,12 @@ CREATE TABLE driver_behavior_events (
   value DECIMAL(8, 2), -- speed, g-force, etc.
   location_lat DECIMAL(10, 8),
   location_lng DECIMAL(11, 8),
+  location TEXT,
+  speed_limit DECIMAL(5,2),
+  actual_speed DECIMAL(5,2),
+  g_force DECIMAL(5,2),
+  duration_seconds INTEGER,
+  notes TEXT,
   timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

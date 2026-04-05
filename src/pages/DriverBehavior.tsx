@@ -27,6 +27,7 @@ export default function DriverBehavior() {
   const [events, setEvents] = useState<DriverBehaviorEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
   const [filter, setFilter] = useState({
     eventType: 'all',
@@ -65,6 +66,10 @@ export default function DriverBehavior() {
       queryClient.invalidateQueries({ queryKey: ['driverBehaviorEvents'] });
       queryClient.invalidateQueries({ queryKey: ['hoursOfService'] });
       setShowCreateForm(false);
+    },
+    onError: (err: any) => {
+      console.error('Error saving driver behavior event:', err);
+      setFormError(err.message || 'Failed to save event');
     }
   });
 
@@ -442,6 +447,7 @@ export default function DriverBehavior() {
 
             <form onSubmit={(e) => {
               e.preventDefault();
+              setFormError(null);
               const formData = new FormData(e.currentTarget);
               const eventData = {
                 equipment_id: formData.get('equipment_id'),
@@ -455,6 +461,12 @@ export default function DriverBehavior() {
               };
               createEventMutation.mutate(eventData);
             }} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2 text-red-600 text-sm">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>{formError}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Equipment</label>
                 <select

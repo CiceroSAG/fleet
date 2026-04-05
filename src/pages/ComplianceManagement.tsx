@@ -321,7 +321,7 @@ export default function ComplianceManagement() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${violationStatus.color}`}>
-                            {violationStatus.status.toUpperCase()}
+                            {(violationStatus.status || '').toUpperCase()}
                           </span>
                         </td>
                       </tr>
@@ -354,10 +354,10 @@ export default function ComplianceManagement() {
                             {report.equipment?.asset_tag || 'Unknown Vehicle'}
                           </h4>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getVehicleConditionColor(report.vehicle_condition)}`}>
-                            {report.vehicle_condition.replace('_', ' ').toUpperCase()}
+                            {(report.vehicle_condition || '').replace('_', ' ').toUpperCase()}
                           </span>
                           <span className="text-xs text-gray-500 uppercase">
-                            {report.report_type.replace('_', ' ')}
+                            {(report.report_type || '').replace('_', ' ')}
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
