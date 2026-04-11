@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getRepairLogs, getEquipment, deleteRepairLog } from '../lib/api';
-import { Plus, Search, AlertCircle, Wrench, Clock, CheckCircle2, MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Search, AlertCircle, Wrench, Clock, CheckCircle2, MoreVertical, Trash2, Edit2, Calendar } from 'lucide-react';
 import RepairLogForm from '../components/RepairLogForm';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -99,6 +99,7 @@ export default function Repairs() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Repair Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Reported</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -122,6 +123,16 @@ export default function Repairs() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       ${log.cost?.toLocaleString() || '0'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                      {log.schedule_id ? (
+                        <span className="inline-flex items-center text-orange-600 font-medium">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Linked
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Manual</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${

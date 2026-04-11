@@ -567,6 +567,7 @@ CREATE TABLE field_service_reports (
   kamoa_hod_date DATE,
   technician_id UUID REFERENCES profiles(id),
   schedule_id UUID REFERENCES maintenance_schedules(id),
+  status TEXT DEFAULT 'pending', -- pending, in_progress, completed
   report_date DATE DEFAULT CURRENT_DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

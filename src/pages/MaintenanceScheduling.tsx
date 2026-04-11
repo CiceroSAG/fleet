@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getMaintenanceSchedulesWithUnderMaintenance, getMaintenanceWorkload, autoAssignMaintenance, checkPartsAvailability, getMaintenanceOptimization } from '@/lib/api';
-import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap, Plus, Edit2 } from 'lucide-react';
+import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap, Plus, Edit2, ClipboardList } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import MaintenanceScheduleForm from '@/components/MaintenanceScheduleForm';
@@ -28,6 +29,9 @@ interface MaintenanceSchedule {
   profiles?: {
     email: string;
   };
+  maintenance_logs?: any[];
+  repair_logs?: any[];
+  field_service_reports?: any[];
 }
 
 export default function MaintenanceScheduling() {
@@ -450,6 +454,33 @@ export default function MaintenanceScheduling() {
                           <p className="text-sm text-gray-600 mt-2">
                             <span className="font-medium">Notes:</span> {schedule.notes}
                           </p>
+                        )}
+
+                        {/* Linked Work Section */}
+                        {(schedule.maintenance_logs?.length > 0 || schedule.repair_logs?.length > 0 || schedule.field_service_reports?.length > 0) && (
+                          <div className="mt-3 pt-3 border-t border-gray-100">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Linked Work History</p>
+                            <div className="flex flex-wrap gap-2">
+                              {schedule.maintenance_logs?.map((log: any) => (
+                                <Link key={log.id} to="/maintenance" className="inline-flex items-center px-2 py-1 rounded bg-blue-50 text-blue-700 text-[10px] font-medium hover:bg-blue-100 transition-colors border border-blue-100">
+                                  <Wrench className="w-3 h-3 mr-1" />
+                                  Maintenance Log ({new Date(log.date).toLocaleDateString()})
+                                </Link>
+                              ))}
+                              {schedule.repair_logs?.map((log: any) => (
+                                <Link key={log.id} to="/repairs" className="inline-flex items-center px-2 py-1 rounded bg-orange-50 text-orange-700 text-[10px] font-medium hover:bg-orange-100 transition-colors border border-orange-100">
+                                  <Wrench className="w-3 h-3 mr-1" />
+                                  Repair Log ({new Date(log.date_reported).toLocaleDateString()})
+                                </Link>
+                              ))}
+                              {schedule.field_service_reports?.map((report: any) => (
+                                <Link key={report.id} to="/field-service-reports" className="inline-flex items-center px-2 py-1 rounded bg-green-50 text-green-700 text-[10px] font-medium hover:bg-green-100 transition-colors border border-green-100">
+                                  <ClipboardList className="w-3 h-3 mr-1" />
+                                  FSR ({new Date(report.report_date).toLocaleDateString()}) - {report.status || 'pending'}
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>

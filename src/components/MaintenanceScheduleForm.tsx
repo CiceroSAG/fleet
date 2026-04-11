@@ -163,7 +163,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
               <input
                 type="text"
                 name="description"
-                value={formData.description}
+                value={formData.description || ''}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
@@ -195,7 +195,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
               <input
                 type="number"
                 name="interval_value"
-                value={formData.interval_value}
+                value={formData.interval_value || ''}
                 onChange={handleChange}
                 required
                 min="0"
@@ -210,7 +210,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
               <input
                 type="date"
                 name="next_due"
-                value={formData.next_due}
+                value={formData.next_due || ''}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
@@ -259,7 +259,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
               </label>
               <select
                 name="assigned_to"
-                value={formData.assigned_to}
+                value={formData.assigned_to || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
               >
@@ -279,7 +279,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
               <input
                 type="number"
                 name="estimated_cost"
-                value={formData.estimated_cost}
+                value={formData.estimated_cost || ''}
                 onChange={handleChange}
                 min="0"
                 step="0.01"
@@ -293,7 +293,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
               </label>
               <textarea
                 name="notes"
-                value={formData.notes}
+                value={formData.notes || ''}
                 onChange={handleChange}
                 rows={3}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none resize-none"

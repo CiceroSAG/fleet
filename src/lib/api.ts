@@ -510,7 +510,7 @@ export async function createMaintenanceLog(log: any, technicianIds: string[] = [
           await updateMaintenanceSchedule(schedule.id, {
             last_performed: newLog.date,
             next_due: nextDue.toISOString(),
-            status: 'active'
+            status: newLog.status === 'completed' ? 'active' : newLog.status
           });
         }
       } else {
@@ -761,7 +761,10 @@ export async function createRepairLog(log: any, scheduleId?: string) {
       try {
         await supabase
           .from('maintenance_schedules')
-          .update({ status: 'completed', last_performed: new Date().toISOString() })
+          .update({ 
+            status: data[0].status === 'completed' ? 'completed' : data[0].status, 
+            last_performed: data[0].status === 'completed' ? new Date().toISOString() : null 
+          })
           .eq('id', scheduleId);
       } catch (err) {
         console.error('Error updating maintenance schedule from repair log:', err);
@@ -1398,7 +1401,10 @@ export async function getMaintenanceSchedules() {
       ),
       profiles:assigned_to (
         email
-      )
+      ),
+      maintenance_logs (id, date, status),
+      repair_logs (id, date_reported, status),
+      field_service_reports (id, report_date, status)
     `)
     .order('next_due', { ascending: true });
 
@@ -3363,7 +3369,8 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
           workplace: sanitizedReport.workplace,
           index_value: asset.index_value,
           next_service_date: asset.next_service_date,
-          status: 'completed'
+          status: sanitizedReport.status === 'completed' ? 'completed' : 
+                  sanitizedReport.status === 'in_progress' ? 'in_progress' : 'scheduled'
         }, [], scheduleId);
       } else if (sanitizedReport.job_type === 'RP' || sanitizedReport.job_type === 'BD') {
         await createRepairLog({
@@ -3373,7 +3380,8 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
           workplace: sanitizedReport.workplace,
           index_value: asset.index_value,
           date_reported: new Date(sanitizedReport.report_date).toISOString(),
-          status: 'completed',
+          status: sanitizedReport.status === 'completed' ? 'completed' : 
+                  sanitizedReport.status === 'in_progress' ? 'in_progress' : 'pending',
           cost: 0
         }, scheduleId);
       }
@@ -3449,6 +3457,22 @@ export async function updateFieldServiceReport(id: string, report: any, assets: 
       .from('field_service_report_parts')
       .insert(partsToInsert);
     if (partsError) throw partsError;
+  }
+
+  // Sync status with linked schedule and logs
+  if (sanitizedReport.status && reportData.schedule_id) {
+    const logStatus = sanitizedReport.status === 'completed' ? 'completed' : 
+                     sanitizedReport.status === 'in_progress' ? 'in_progress' : 
+                     (sanitizedReport.job_type === 'PM' ? 'scheduled' : 'pending');
+
+    await Promise.all([
+      supabase.from('maintenance_logs').update({ status: logStatus }).eq('schedule_id', reportData.schedule_id),
+      supabase.from('repair_logs').update({ status: logStatus }).eq('schedule_id', reportData.schedule_id),
+      supabase.from('maintenance_schedules').update({ 
+        status: sanitizedReport.status === 'completed' ? 'completed' : 
+                sanitizedReport.status === 'in_progress' ? 'in_progress' : 'active' 
+      }).eq('id', reportData.schedule_id)
+    ]);
   }
 
   return reportData;

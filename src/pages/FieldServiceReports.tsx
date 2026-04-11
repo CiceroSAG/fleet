@@ -179,14 +179,23 @@ export default function FieldServiceReports() {
                     <div className="bg-orange-50 p-3 rounded-xl">
                       <FileText className="w-6 h-6 text-orange-600" />
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                      report.job_type === 'PM' ? 'bg-blue-50 text-blue-600' :
-                      report.job_type === 'RP' ? 'bg-red-50 text-red-600' :
-                      report.job_type === 'BD' ? 'bg-orange-50 text-orange-600' :
-                      'bg-green-50 text-green-600'
-                    }`}>
-                      {report.job_type}
-                    </span>
+                    <div className="flex flex-col items-end space-y-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        report.job_type === 'PM' ? 'bg-blue-50 text-blue-600' :
+                        report.job_type === 'RP' ? 'bg-red-50 text-red-600' :
+                        report.job_type === 'BD' ? 'bg-orange-50 text-orange-600' :
+                        'bg-green-50 text-green-600'
+                      }`}>
+                        {report.job_type}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        report.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        report.status === 'in_progress' ? 'bg-orange-100 text-orange-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {report.status || 'pending'}
+                      </span>
+                    </div>
                   </div>
                   
                   <div>
@@ -252,6 +261,7 @@ export default function FieldServiceReports() {
             kamoa_hod_date: editingReport.kamoa_hod_date,
             technician_id: editingReport.technician_id,
             report_date: editingReport.report_date,
+            status: editingReport.status,
             assets: editingReport.field_service_report_assets?.map((a: any) => ({
               equipment_id: a.equipment_id,
               index_value: a.index_value,
@@ -321,7 +331,7 @@ export default function FieldServiceReports() {
               </div>
             </div>
             <div id="printable-report" className="flex-1 overflow-y-auto p-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Workplace</span>
                   <p className="font-bold text-gray-900">{selectedReport.workplace}</p>
@@ -334,6 +344,25 @@ export default function FieldServiceReports() {
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date</span>
                   <p className="font-bold text-gray-900">{new Date(selectedReport.report_date).toLocaleDateString()}</p>
                 </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</span>
+                  <p className={`font-bold uppercase ${
+                    selectedReport.status === 'completed' ? 'text-green-600' :
+                    selectedReport.status === 'in_progress' ? 'text-orange-600' :
+                    'text-gray-600'
+                  }`}>
+                    {selectedReport.status || 'pending'}
+                  </p>
+                </div>
+                {selectedReport.schedule_id && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Linked Schedule</span>
+                    <p className="font-bold text-orange-600 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {selectedReport.schedule_id.substring(0, 8)}...
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">

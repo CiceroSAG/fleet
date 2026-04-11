@@ -189,7 +189,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
                 <input
                   type="date"
                   name="date"
-                  value={formData.date}
+                  value={formData.date || ''}
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -203,7 +203,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
                 <input
                   type="number"
                   name="cost"
-                  value={formData.cost}
+                  value={formData.cost || ''}
                   onChange={handleChange}
                   placeholder="0.00"
                   step="0.01"
@@ -215,7 +215,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
                 <input
                   type="number"
                   name="index_value"
-                  value={formData.index_value}
+                  value={formData.index_value || ''}
                   onChange={handleChange}
                   placeholder="Current reading"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -229,7 +229,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
                 <input
                   type="text"
                   name="workplace"
-                  value={formData.workplace}
+                  value={formData.workplace || ''}
                   onChange={handleChange}
                   placeholder="Location"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -240,7 +240,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
                 <input
                   type="date"
                   name="next_service_date"
-                  value={formData.next_service_date}
+                  value={formData.next_service_date || ''}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 />

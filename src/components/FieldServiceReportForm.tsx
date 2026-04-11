@@ -23,6 +23,7 @@ interface FieldServiceReportFormProps {
     kamoa_hod_date?: string;
     technician_id?: string;
     report_date?: string;
+    status?: string;
     assets?: { equipment_id: string; index_value: number; next_service_date: string }[];
     parts?: { part_description: string; quantity_used: number; remark: string }[];
   };
@@ -54,6 +55,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
     kamoa_hod_date: initialData?.kamoa_hod_date || new Date().toISOString().split('T')[0],
     technician_id: initialData?.technician_id || profile?.id || '',
     report_date: initialData?.report_date || new Date().toISOString().split('T')[0],
+    status: initialData?.status || 'pending',
   });
 
   // Update technician name when record is loaded
@@ -154,7 +156,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               <Building2 className="w-5 h-5" />
               <h3 className="font-semibold uppercase tracking-wider text-sm">General Information</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Workplace / Lieu de travail</label>
                 <input
@@ -177,6 +179,18 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                   <option value="PM">Preventive Maintenance (PM)</option>
                   <option value="RP">Repair (RP)</option>
                   <option value="SAF">Safety (SAF)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                <select
+                  value={report.status}
+                  onChange={e => setReport({ ...report, status: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
                 </select>
               </div>
               <div>
@@ -352,7 +366,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                     <input
                       type="text"
                       placeholder="Remark"
-                      value={part.remark}
+                      value={part.remark || ''}
                       onChange={e => handlePartChange(index, 'remark', e.target.value)}
                       className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                     />
@@ -379,7 +393,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Technician</label>
                 <select
-                  value={report.technician_name}
+                  value={report.technician_name || ''}
                   onChange={e => setReport({ ...report, technician_name: e.target.value })}
                   className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                 >
@@ -390,7 +404,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                 </select>
                 <input
                   type="date"
-                  value={report.report_date}
+                  value={report.report_date || ''}
                   onChange={e => setReport({ ...report, report_date: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                 />
@@ -399,14 +413,14 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Supervisor</label>
                 <input
                   type="text"
-                  value={report.supervisor_name}
+                  value={report.supervisor_name || ''}
                   onChange={e => setReport({ ...report, supervisor_name: e.target.value })}
                   className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                   placeholder="Name"
                 />
                 <input
                   type="date"
-                  value={report.supervisor_date}
+                  value={report.supervisor_date || ''}
                   onChange={e => setReport({ ...report, supervisor_date: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                 />
@@ -415,14 +429,14 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Manager</label>
                 <input
                   type="text"
-                  value={report.manager_name}
+                  value={report.manager_name || ''}
                   onChange={e => setReport({ ...report, manager_name: e.target.value })}
                   className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                   placeholder="Name"
                 />
                 <input
                   type="date"
-                  value={report.manager_date}
+                  value={report.manager_date || ''}
                   onChange={e => setReport({ ...report, manager_date: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                 />
@@ -431,14 +445,14 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">KAMOA HOD</label>
                 <input
                   type="text"
-                  value={report.kamoa_hod_name}
+                  value={report.kamoa_hod_name || ''}
                   onChange={e => setReport({ ...report, kamoa_hod_name: e.target.value })}
                   className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                   placeholder="Name"
                 />
                 <input
                   type="date"
-                  value={report.kamoa_hod_date}
+                  value={report.kamoa_hod_date || ''}
                   onChange={e => setReport({ ...report, kamoa_hod_date: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                 />

@@ -158,7 +158,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 <input
                   type="date"
                   name="date_reported"
-                  value={formData.date_reported}
+                  value={formData.date_reported || ''}
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -169,7 +169,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 <input
                   type="number"
                   name="cost"
-                  value={formData.cost}
+                  value={formData.cost || ''}
                   onChange={handleChange}
                   step="0.01"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -183,7 +183,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 <input
                   type="number"
                   name="index_value"
-                  value={formData.index_value}
+                  value={formData.index_value || ''}
                   onChange={handleChange}
                   placeholder="Current reading"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -194,7 +194,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 <input
                   type="text"
                   name="workplace"
-                  value={formData.workplace}
+                  value={formData.workplace || ''}
                   onChange={handleChange}
                   placeholder="Location"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -206,7 +206,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
               <label className="block text-sm font-medium text-gray-700 mb-1">Issue Description</label>
               <textarea
                 name="issue_description"
-                value={formData.issue_description}
+                value={formData.issue_description || ''}
                 onChange={handleChange}
                 rows={2}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
@@ -218,7 +218,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
               <label className="block text-sm font-medium text-gray-700 mb-1">Action Taken / Work Done</label>
               <textarea
                 name="action_taken"
-                value={formData.action_taken}
+                value={formData.action_taken || ''}
                 onChange={handleChange}
                 rows={2}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
