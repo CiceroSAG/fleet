@@ -53,7 +53,13 @@ export default function IncidentForm({ incident, onClose }: IncidentFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    mutation.mutate(formData);
+    
+    const dataToSubmit = {
+      ...formData,
+      operator_id: formData.operator_id || null,
+    };
+    
+    mutation.mutate(dataToSubmit);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

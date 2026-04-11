@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getIncidents, getEquipment, getOperators, deleteIncident } from '../lib/api';
 import { Plus, Search, AlertTriangle, ShieldAlert, Calendar, User, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import IncidentForm from '../components/IncidentForm';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function Incidents() {
   const queryClient = useQueryClient();
@@ -10,6 +11,7 @@ export default function Incidents() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: incidents, isLoading } = useQuery({
     queryKey: ['incidents'],
@@ -48,8 +50,13 @@ export default function Incidents() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this incident report?')) {
-      deleteMutation.mutate(id);
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -187,6 +194,14 @@ export default function Incidents() {
           }}
         />
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Incident Report"
+        message="Are you sure you want to delete this incident report?"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

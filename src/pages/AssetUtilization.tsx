@@ -52,9 +52,9 @@ export default function AssetUtilization() {
     if (metrics.length === 0) return null;
 
     const totalAssets = new Set(metrics.map(m => m.equipment_id)).size;
-    const avgUtilization = metrics.reduce((sum, m) => sum + m.utilization_percentage, 0) / metrics.length;
-    const totalRevenue = metrics.reduce((sum, m) => sum + m.revenue_generated, 0);
-    const totalOperatingCost = metrics.reduce((sum, m) => sum + m.operating_cost, 0);
+    const avgUtilization = metrics.reduce((sum, m) => sum + (m.utilization_percentage || 0), 0) / metrics.length;
+    const totalRevenue = metrics.reduce((sum, m) => sum + (m.revenue_generated || 0), 0);
+    const totalOperatingCost = metrics.reduce((sum, m) => sum + (m.operating_cost || 0), 0);
     const netProfit = totalRevenue - totalOperatingCost;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
@@ -85,10 +85,10 @@ export default function AssetUtilization() {
         };
       }
 
-      acc[assetId].totalUtilization += metric.utilization_percentage;
+      acc[assetId].totalUtilization += (metric.utilization_percentage || 0);
       acc[assetId].count += 1;
-      acc[assetId].totalRevenue += metric.revenue_generated;
-      acc[assetId].totalCost += metric.operating_cost;
+      acc[assetId].totalRevenue += (metric.revenue_generated || 0);
+      acc[assetId].totalCost += (metric.operating_cost || 0);
 
       return acc;
     }, {} as Record<string, any>);
@@ -114,9 +114,9 @@ export default function AssetUtilization() {
           count: 0
         };
       }
-      acc[date].avgUtilization = (acc[date].avgUtilization * acc[date].count + metric.utilization_percentage) / (acc[date].count + 1);
-      acc[date].totalRevenue += metric.revenue_generated;
-      acc[date].totalCost += metric.operating_cost;
+      acc[date].avgUtilization = (acc[date].avgUtilization * acc[date].count + (metric.utilization_percentage || 0)) / (acc[date].count + 1);
+      acc[date].totalRevenue += (metric.revenue_generated || 0);
+      acc[date].totalCost += (metric.operating_cost || 0);
       acc[date].count += 1;
       return acc;
     }, {} as Record<string, any>);

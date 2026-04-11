@@ -2,12 +2,30 @@ import { supabase } from './supabase';
 
 // --- Settings ---
 export async function getSettings() {
+  const defaultFeatures = {
+    fuel_logs: true,
+    parts: true,
+    maintenance: true,
+    repairs: true,
+    incidents: true,
+    tracking: true,
+    driver_behavior: true,
+    fuel_management: true,
+    scheduling: true,
+    compliance: true,
+    utilization: true,
+    reports: true,
+    user_management: true,
+    technicians: true
+  };
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
     return {
       fuel_price_per_gallon: 3.50,
       preventive_maintenance_interval: 90,
       company_name: 'Fleet Management Inc.',
-      currency: 'USD'
+      currency: 'USD',
+      features: defaultFeatures
     };
   }
   const { data, error } = await supabase
@@ -17,7 +35,15 @@ export async function getSettings() {
     .single();
   
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 is no rows returned
-  return data;
+  
+  if (data) {
+    return {
+      ...data,
+      features: data.features || defaultFeatures
+    };
+  }
+  
+  return { features: defaultFeatures };
 }
 
 export async function updateSettings(settings: any) {
@@ -38,21 +64,47 @@ export async function updateSettings(settings: any) {
   } else {
     const { data, error } = await supabase
       .from('settings')
-      .insert([settings])
+      .insert([{ ...settings, updated_at: new Date().toISOString() }])
       .select();
     if (error) throw error;
     return data[0];
   }
 }
 
+export async function uploadLogo(file: File) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return URL.createObjectURL(file);
+  }
+  
+  const fileExt = file.name.split('.').pop();
+  const fileName = `logo-${Math.random()}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('company-assets')
+    .upload(filePath, file);
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage
+    .from('company-assets')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+
 // --- Categories ---
+let mockCategoriesData = [
+  { id: 'c1111111-1111-1111-1111-111111111111', name: 'Trucks' },
+  { id: 'c2222222-2222-2222-2222-222222222222', name: 'Excavators' },
+  { id: 'c3333333-3333-3333-3333-333333333333', name: 'Light Vehicles' }
+];
+
 export async function getCategories() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'c1111111-1111-1111-1111-111111111111', name: 'Trucks' },
-      { id: 'c2222222-2222-2222-2222-222222222222', name: 'Excavators' },
-      { id: 'c3333333-3333-3333-3333-333333333333', name: 'Light Vehicles' }
-    ];
+    return [...mockCategoriesData];
   }
   const { data, error } = await supabase
     .from('equipment_categories')
@@ -76,6 +128,7 @@ export async function createCategory(category: any) {
 
 export async function deleteCategory(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockCategoriesData = mockCategoriesData.filter(c => c.id !== id);
     return;
   }
   const { error } = await supabase.from('equipment_categories').delete().eq('id', id);
@@ -83,13 +136,15 @@ export async function deleteCategory(id: string) {
 }
 
 // --- Equipment ---
+let mockEquipmentData = [
+  { id: '11111111-1111-1111-1111-111111111111', asset_tag: 'TRK-001', type: 'Dump Truck', status: 'Active', manufacturer: 'Volvo', model: 'FMX', year: 2022 },
+  { id: '22222222-2222-2222-2222-222222222222', asset_tag: 'EXC-001', type: 'Excavator', status: 'Under Maintenance', manufacturer: 'CAT', model: '320', year: 2021 },
+  { id: '33333333-3333-3333-3333-333333333333', asset_tag: 'LV-001', type: 'Light Vehicle', status: 'Active', manufacturer: 'Toyota', model: 'Hilux', year: 2023 }
+];
+
 export async function getEquipment() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: '11111111-1111-1111-1111-111111111111', asset_tag: 'TRK-001', type: 'Dump Truck', status: 'Active', manufacturer: 'Volvo', model: 'FMX', year: 2022 },
-      { id: '22222222-2222-2222-2222-222222222222', asset_tag: 'EXC-001', type: 'Excavator', status: 'Under Maintenance', manufacturer: 'CAT', model: '320', year: 2021 },
-      { id: '33333333-3333-3333-3333-333333333333', asset_tag: 'LV-001', type: 'Light Vehicle', status: 'Active', manufacturer: 'Toyota', model: 'Hilux', year: 2023 }
-    ];
+    return [...mockEquipmentData];
   }
   const { data, error } = await supabase
     .from('equipment')
@@ -106,20 +161,32 @@ export async function getEquipment() {
 }
 
 export async function createEquipment(equipment: any) {
+  // Sanitize empty strings to null
+  const sanitizedEquipment = { ...equipment };
+  Object.keys(sanitizedEquipment).forEach(key => {
+    if (sanitizedEquipment[key] === '') sanitizedEquipment[key] = null;
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return { id: Math.random().toString(36).substring(7), ...equipment };
+    return { id: Math.random().toString(36).substring(7), ...sanitizedEquipment };
   }
   const { data, error } = await supabase
     .from('equipment')
-    .insert([equipment])
+    .insert([sanitizedEquipment])
     .select();
   if (error) throw error;
   return data[0];
 }
 
 export async function updateEquipment(id: string, equipment: any) {
+  // Sanitize empty strings to null
+  const sanitizedEquipment = { ...equipment };
+  Object.keys(sanitizedEquipment).forEach(key => {
+    if (sanitizedEquipment[key] === '') sanitizedEquipment[key] = null;
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return { id, ...equipment };
+    return { id, ...sanitizedEquipment };
   }
   const { data: oldEquipment, error: fetchError } = await supabase
     .from('equipment')
@@ -157,6 +224,7 @@ export async function updateEquipment(id: string, equipment: any) {
 
 export async function deleteEquipment(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockEquipmentData = mockEquipmentData.filter(e => e.id !== id);
     return;
   }
   const { error } = await supabase
@@ -167,12 +235,14 @@ export async function deleteEquipment(id: string) {
 }
 
 // --- Operators ---
+let mockOperatorsData = [
+  { id: '00000000-0000-0000-0000-000000000001', name: 'John Doe', license_number: 'L123456', status: 'Active' },
+  { id: '00000000-0000-0000-0000-000000000002', name: 'Jane Smith', license_number: 'L789012', status: 'Active' }
+];
+
 export async function getOperators() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: '00000000-0000-0000-0000-000000000001', name: 'John Doe', license_number: 'L123456', status: 'Active' },
-      { id: '00000000-0000-0000-0000-000000000002', name: 'Jane Smith', license_number: 'L789012', status: 'Active' }
-    ];
+    return [...mockOperatorsData];
   }
   const { data, error } = await supabase
     .from('operators')
@@ -216,6 +286,7 @@ export async function updateOperator(id: string, operator: any) {
 
 export async function deleteOperator(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockOperatorsData = mockOperatorsData.filter(o => o.id !== id);
     return;
   }
   const { error } = await supabase
@@ -254,11 +325,18 @@ export async function getFuelLogs() {
 
 export async function createFuelLog(log: any) {
   console.log('Creating fuel log:', log);
+
+  // Sanitize empty strings to null
+  const sanitizedLog = { ...log };
+  Object.keys(sanitizedLog).forEach(key => {
+    if (sanitizedLog[key] === '') sanitizedLog[key] = null;
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
     const newLog = { 
       id: 'f' + Math.random().toString(36).substring(2, 10), 
-      ...log,
-      equipment: log.equipment_id === '11111111-1111-1111-1111-111111111111' 
+      ...sanitizedLog,
+      equipment: sanitizedLog.equipment_id === '11111111-1111-1111-1111-111111111111' 
         ? { asset_tag: 'TRK-001', type: 'Dump Truck' }
         : { asset_tag: 'LV-001', type: 'Light Vehicle' }
     };
@@ -267,7 +345,7 @@ export async function createFuelLog(log: any) {
   }
   const { data, error } = await supabase
     .from('fuel_logs')
-    .insert([log])
+    .insert([sanitizedLog])
     .select();
   
   if (error) {
@@ -334,12 +412,14 @@ export async function deleteFuelLog(id: string) {
 }
 
 // --- Maintenance Logs ---
+let mockMaintenanceLogs = [
+  { id: 'm1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', date: new Date().toISOString(), service_type: 'routine', cost: 250, notes: 'Oil change', status: 'completed', approval_status: 'approved', equipment: { id: '11111111-1111-1111-1111-111111111111', asset_tag: 'TRK-001', type: 'Dump Truck' }, maintenance_technicians: [] },
+  { id: 'm2222222-2222-2222-2222-222222222222', equipment_id: '22222222-2222-2222-2222-222222222222', date: new Date().toISOString(), service_type: 'repair', cost: 1200, notes: 'Hydraulic pump repair', status: 'in_progress', approval_status: 'pending', equipment: { id: '22222222-2222-2222-2222-222222222222', asset_tag: 'EXC-001', type: 'Excavator' }, maintenance_technicians: [] }
+];
+
 export async function getMaintenanceLogs() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'm1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', date: new Date().toISOString(), service_type: 'routine', cost: 250, notes: 'Oil change', equipment: { id: '11111111-1111-1111-1111-111111111111', asset_tag: 'TRK-001', type: 'Dump Truck' } },
-      { id: 'm2222222-2222-2222-2222-222222222222', equipment_id: '22222222-2222-2222-2222-222222222222', date: new Date().toISOString(), service_type: 'repair', cost: 1200, notes: 'Hydraulic pump repair', equipment: { id: '22222222-2222-2222-2222-222222222222', asset_tag: 'EXC-001', type: 'Excavator' } }
-    ];
+    return [...mockMaintenanceLogs];
   }
   const { data, error } = await supabase
     .from('maintenance_logs')
@@ -349,6 +429,13 @@ export async function getMaintenanceLogs() {
         id,
         asset_tag,
         type
+      ),
+      maintenance_technicians (
+        technician_id,
+        technicians (
+          id,
+          name
+        )
       )
     `)
     .order('date', { ascending: false });
@@ -357,14 +444,28 @@ export async function getMaintenanceLogs() {
   return data;
 }
 
-export async function createMaintenanceLog(log: any) {
+export async function createMaintenanceLog(log: any, technicianIds: string[] = [], scheduleId?: string) {
   console.log('Creating maintenance log:', log);
+  
+  // Sanitize empty strings to null to prevent database errors (e.g. for DATE fields)
+  const sanitizedLog = { ...log };
+  if (scheduleId && !scheduleId.startsWith('under-maintenance-')) {
+    sanitizedLog.schedule_id = scheduleId;
+  }
+  Object.keys(sanitizedLog).forEach(key => {
+    if (sanitizedLog[key] === '') {
+      sanitizedLog[key] = null;
+    }
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return { id: Math.random().toString(36).substring(7), ...log };
+    const newLog = { id: Math.random().toString(36).substring(7), ...sanitizedLog, maintenance_technicians: technicianIds.map(id => ({ technician_id: id })) };
+    mockMaintenanceLogs = [newLog, ...mockMaintenanceLogs];
+    return newLog;
   }
   const { data, error } = await supabase
     .from('maintenance_logs')
-    .insert([log])
+    .insert([sanitizedLog])
     .select();
   
   if (error) {
@@ -372,12 +473,49 @@ export async function createMaintenanceLog(log: any) {
     throw error;
   }
 
-  console.log('Maintenance log created successfully:', data[0]);
+  const newLog = data[0];
+
+  // Add technicians
+  if (technicianIds.length > 0) {
+    const techLinks = technicianIds.map(techId => ({
+      maintenance_log_id: newLog.id,
+      technician_id: techId
+    }));
+    await supabase.from('maintenance_technicians').insert(techLinks);
+  }
+
+  console.log('Maintenance log created successfully:', newLog);
 
   // Update maintenance schedule and equipment status after creating log
-  if (data && data[0]) {
+  if (newLog) {
     try {
-      await updateMaintenanceScheduleFromLog(data[0].id);
+      if (scheduleId && !scheduleId.startsWith('under-maintenance-')) {
+        // Update specific schedule
+        const { data: schedule } = await supabase
+          .from('maintenance_schedules')
+          .select('*')
+          .eq('id', scheduleId)
+          .single();
+          
+        if (schedule) {
+          const nextDue = new Date(newLog.date);
+          if (schedule.interval_type === 'days') {
+            nextDue.setDate(nextDue.getDate() + schedule.interval_value);
+          } else if (schedule.interval_type === 'hours') {
+            nextDue.setDate(nextDue.getDate() + Math.ceil(schedule.interval_value / 8));
+          } else if (schedule.interval_type === 'miles') {
+            nextDue.setDate(nextDue.getDate() + 30);
+          }
+
+          await updateMaintenanceSchedule(schedule.id, {
+            last_performed: newLog.date,
+            next_due: nextDue.toISOString(),
+            status: 'active'
+          });
+        }
+      } else {
+        await updateMaintenanceScheduleFromLog(newLog.id);
+      }
       
       // Sync Equipment Status
       let newEquipmentStatus = 'Active';
@@ -395,22 +533,46 @@ export async function createMaintenanceLog(log: any) {
     }
   }
 
-  return data[0];
+  return newLog;
 }
 
-export async function updateMaintenanceLog(id: string, log: any) {
+export async function updateMaintenanceLog(id: string, log: any, technicianIds: string[] = []) {
+  // Sanitize empty strings to null
+  const sanitizedLog = { ...log };
+  Object.keys(sanitizedLog).forEach(key => {
+    if (sanitizedLog[key] === '') sanitizedLog[key] = null;
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return { id, ...log };
+    mockMaintenanceLogs = mockMaintenanceLogs.map(l => 
+      l.id === id ? { ...l, ...sanitizedLog, maintenance_technicians: technicianIds.map(tid => ({ technician_id: tid })) } : l
+    );
+    return { id, ...sanitizedLog };
   }
   const { data, error } = await supabase
     .from('maintenance_logs')
-    .update(log)
+    .update(sanitizedLog)
     .eq('id', id)
     .select();
   if (error) throw error;
   
+  const updatedLog = data[0];
+
+  // Update technicians
+  // First remove existing
+  await supabase.from('maintenance_technicians').delete().eq('maintenance_log_id', id);
+  
+  // Then add new ones
+  if (technicianIds.length > 0) {
+    const techLinks = technicianIds.map(techId => ({
+      maintenance_log_id: id,
+      technician_id: techId
+    }));
+    await supabase.from('maintenance_technicians').insert(techLinks);
+  }
+
   // Sync Equipment Status
-  if (data && data[0]) {
+  if (updatedLog) {
     try {
       let newEquipmentStatus = 'Active';
       if (log.status === 'scheduled' || log.status === 'in_progress') {
@@ -420,29 +582,119 @@ export async function updateMaintenanceLog(id: string, log: any) {
       await supabase
         .from('equipment')
         .update({ status: newEquipmentStatus })
-        .eq('id', log.equipment_id || data[0].equipment_id);
+        .eq('id', log.equipment_id || updatedLog.equipment_id);
     } catch (err) {
       console.error('Error updating equipment status from maintenance log:', err);
     }
   }
   
-  return data[0];
+  return updatedLog;
 }
 
 export async function deleteMaintenanceLog(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockMaintenanceLogs = mockMaintenanceLogs.filter(log => log.id !== id);
     return;
   }
   const { error } = await supabase.from('maintenance_logs').delete().eq('id', id);
   if (error) throw error;
 }
 
+export async function approveMaintenanceLog(id: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockMaintenanceLogs = mockMaintenanceLogs.map(log => 
+      log.id === id ? { ...log, approval_status: 'approved' } : log
+    );
+    return { id, approval_status: 'approved' };
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('maintenance_logs')
+    .update({ 
+      approval_status: 'approved',
+      approved_by: user?.id,
+      approved_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+// --- Technicians ---
+let mockTechniciansData = [
+  { id: '1', name: 'John Smith', specialty: 'Engine Specialist', contact_info: 'john@example.com', status: 'Active', user_id: 'mock-user-id' },
+  { id: '2', name: 'Mike Johnson', specialty: 'Hydraulics', contact_info: 'mike@example.com', status: 'Active' }
+];
+
+export async function getTechnicians() {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [...mockTechniciansData];
+  }
+  const { data, error } = await supabase
+    .from('technicians')
+    .select('*')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+export async function getTechnicianByUserId(userId: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return { id: '1', name: 'John Smith', specialty: 'Engine Specialist', contact_info: 'john@example.com', status: 'Active', user_id: userId };
+  }
+  const { data, error } = await supabase
+    .from('technicians')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  return data;
+}
+
+export async function createTechnician(technician: any) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return { id: Math.random().toString(36).substring(7), ...technician };
+  }
+  const { data, error } = await supabase
+    .from('technicians')
+    .insert([technician])
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function updateTechnician(id: string, technician: any) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return { id, ...technician };
+  }
+  const { data, error } = await supabase
+    .from('technicians')
+    .update(technician)
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function deleteTechnician(id: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockTechniciansData = mockTechniciansData.filter(t => t.id !== id);
+    return;
+  }
+  const { error } = await supabase.from('technicians').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // --- Repair Logs ---
+let mockRepairLogsData = [
+  { id: 'r1111111-1111-1111-1111-111111111111', equipment_id: '22222222-2222-2222-2222-222222222222', date_reported: new Date().toISOString(), description: 'Hydraulic leak', status: 'In Progress', equipment: { asset_tag: 'EXC-001', type: 'Excavator' } }
+];
+
 export async function getRepairLogs() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'r1111111-1111-1111-1111-111111111111', equipment_id: '22222222-2222-2222-2222-222222222222', date_reported: new Date().toISOString(), description: 'Hydraulic leak', status: 'In Progress', equipment: { asset_tag: 'EXC-001', type: 'Excavator' } }
-    ];
+    return [...mockRepairLogsData];
   }
   const { data, error } = await supabase
     .from('repair_logs')
@@ -459,14 +711,26 @@ export async function getRepairLogs() {
   return data;
 }
 
-export async function createRepairLog(log: any) {
+export async function createRepairLog(log: any, scheduleId?: string) {
   console.log('Creating repair log:', log);
+
+  // Sanitize empty strings to null to prevent database errors (e.g. for DATE fields)
+  const sanitizedLog = { ...log };
+  if (scheduleId) {
+    sanitizedLog.schedule_id = scheduleId;
+  }
+  Object.keys(sanitizedLog).forEach(key => {
+    if (sanitizedLog[key] === '') {
+      sanitizedLog[key] = null;
+    }
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return { id: Math.random().toString(36).substring(7), ...log };
+    return { id: Math.random().toString(36).substring(7), ...sanitizedLog };
   }
   const { data, error } = await supabase
     .from('repair_logs')
-    .insert([log])
+    .insert([sanitizedLog])
     .select();
   
   if (error) {
@@ -480,7 +744,7 @@ export async function createRepairLog(log: any) {
   if (data && data[0]) {
     try {
       let newEquipmentStatus = 'Active';
-      if (log.status === 'Pending' || log.status === 'In Progress') {
+      if (log.status === 'pending' || log.status === 'in_progress' || log.status === 'Pending' || log.status === 'In Progress') {
         newEquipmentStatus = 'Repair Required';
       }
       
@@ -491,6 +755,18 @@ export async function createRepairLog(log: any) {
     } catch (err) {
       console.error('Error updating equipment status from repair log:', err);
     }
+
+    // Update maintenance schedule if linked
+    if (scheduleId) {
+      try {
+        await supabase
+          .from('maintenance_schedules')
+          .update({ status: 'completed', last_performed: new Date().toISOString() })
+          .eq('id', scheduleId);
+      } catch (err) {
+        console.error('Error updating maintenance schedule from repair log:', err);
+      }
+    }
   }
   
   return data[0];
@@ -498,12 +774,19 @@ export async function createRepairLog(log: any) {
 
 export async function updateRepairLog(id: string, log: any) {
   console.log('Updating repair log:', id, log);
+
+  // Sanitize empty strings to null
+  const sanitizedLog = { ...log };
+  Object.keys(sanitizedLog).forEach(key => {
+    if (sanitizedLog[key] === '') sanitizedLog[key] = null;
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return { id, ...log };
+    return { id, ...sanitizedLog };
   }
   const { data, error } = await supabase
     .from('repair_logs')
-    .update(log)
+    .update(sanitizedLog)
     .eq('id', id)
     .select();
   
@@ -518,7 +801,7 @@ export async function updateRepairLog(id: string, log: any) {
   if (data && data[0]) {
     try {
       let newEquipmentStatus = 'Active';
-      if (log.status === 'Pending' || log.status === 'In Progress') {
+      if (log.status === 'pending' || log.status === 'in_progress' || log.status === 'Pending' || log.status === 'In Progress') {
         newEquipmentStatus = 'Repair Required';
       }
       
@@ -536,6 +819,7 @@ export async function updateRepairLog(id: string, log: any) {
 
 export async function deleteRepairLog(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockRepairLogsData = mockRepairLogsData.filter(r => r.id !== id);
     return;
   }
   const { error } = await supabase.from('repair_logs').delete().eq('id', id);
@@ -543,11 +827,13 @@ export async function deleteRepairLog(id: string) {
 }
 
 // --- Incidents ---
+let mockIncidentsData = [
+  { id: 'i1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', date: new Date().toISOString(), type: 'collision', severity: 'minor', description: 'Minor fender bender', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' } }
+];
+
 export async function getIncidents() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'i1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', date: new Date().toISOString(), type: 'collision', severity: 'minor', description: 'Minor fender bender', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' } }
-    ];
+    return [...mockIncidentsData];
   }
   const { data, error } = await supabase
     .from('incidents')
@@ -567,12 +853,19 @@ export async function getIncidents() {
 
 export async function createIncident(incident: any) {
   console.log('Creating incident report:', incident);
+
+  // Sanitize empty strings to null
+  const sanitizedIncident = { ...incident };
+  Object.keys(sanitizedIncident).forEach(key => {
+    if (sanitizedIncident[key] === '') sanitizedIncident[key] = null;
+  });
+
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return { id: Math.random().toString(36).substring(7), ...incident };
+    return { id: Math.random().toString(36).substring(7), ...sanitizedIncident };
   }
   const { data, error } = await supabase
     .from('incidents')
-    .insert([incident])
+    .insert([sanitizedIncident])
     .select();
   
   if (error) {
@@ -617,6 +910,7 @@ export async function updateIncident(id: string, incident: any) {
 
 export async function deleteIncident(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockIncidentsData = mockIncidentsData.filter(i => i.id !== id);
     return;
   }
   const { error } = await supabase.from('incidents').delete().eq('id', id);
@@ -626,12 +920,14 @@ export async function deleteIncident(id: string) {
 // --- Advanced Fleet Management CRUD Operations ---
 
 // Vehicle Locations (Real-Time Tracking)
+let mockVehicleLocationsData = [
+  { id: 'v1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', latitude: -1.2833, longitude: 36.8167, speed: 45, timestamp: new Date().toISOString(), equipment: { asset_tag: 'TRK-001', type: 'Dump Truck', assigned_operator_id: '00000000-0000-0000-0000-000000000001', operators: { name: 'John Doe' } } },
+  { id: 'v2222222-2222-2222-2222-222222222222', equipment_id: '33333333-3333-3333-3333-333333333333', latitude: -1.2921, longitude: 36.8219, speed: 0, timestamp: new Date().toISOString(), equipment: { asset_tag: 'LV-001', type: 'Light Vehicle', assigned_operator_id: '00000000-0000-0000-0000-000000000002', operators: { name: 'Jane Smith' } } }
+];
+
 export async function getVehicleLocations(limit = 100) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'v1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', latitude: -1.2833, longitude: 36.8167, speed: 45, timestamp: new Date().toISOString(), equipment: { asset_tag: 'TRK-001', type: 'Dump Truck', assigned_operator_id: '00000000-0000-0000-0000-000000000001', operators: { name: 'John Doe' } } },
-      { id: 'v2222222-2222-2222-2222-222222222222', equipment_id: '33333333-3333-3333-3333-333333333333', latitude: -1.2921, longitude: 36.8219, speed: 0, timestamp: new Date().toISOString(), equipment: { asset_tag: 'LV-001', type: 'Light Vehicle', assigned_operator_id: '00000000-0000-0000-0000-000000000002', operators: { name: 'Jane Smith' } } }
-    ];
+    return [...mockVehicleLocationsData];
   }
   const { data, error } = await supabase
     .from('vehicle_locations')
@@ -693,6 +989,7 @@ export async function updateVehicleLocation(id: string, location: any) {
 
 export async function deleteVehicleLocation(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockVehicleLocationsData = mockVehicleLocationsData.filter(v => v.id !== id);
     return;
   }
   const { error } = await supabase.from('vehicle_locations').delete().eq('id', id);
@@ -700,11 +997,13 @@ export async function deleteVehicleLocation(id: string) {
 }
 
 // Driver Behavior Events
+let mockDriverBehaviorEventsData = [
+  { id: 'd1111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', event_type: 'harsh_braking', severity: 'medium', timestamp: new Date().toISOString(), equipment: { asset_tag: 'TRK-001' }, operators: { name: 'John Doe' } }
+];
+
 export async function getDriverBehaviorEvents(limit = 100) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'd1111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', event_type: 'harsh_braking', severity: 'medium', timestamp: new Date().toISOString(), equipment: { asset_tag: 'TRK-001' }, operators: { name: 'John Doe' } }
-    ];
+    return [...mockDriverBehaviorEventsData];
   }
   const { data, error } = await supabase
     .from('driver_behavior_events')
@@ -766,6 +1065,7 @@ export async function updateDriverBehaviorEvent(id: string, event: any) {
 
 export async function deleteDriverBehaviorEvent(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockDriverBehaviorEventsData = mockDriverBehaviorEventsData.filter(d => d.id !== id);
     return;
   }
   const { error } = await supabase.from('driver_behavior_events').delete().eq('id', id);
@@ -773,11 +1073,13 @@ export async function deleteDriverBehaviorEvent(id: string) {
 }
 
 // Routes
+let mockRoutesData = [
+  { id: 'r1111111-1111-1111-1111-111111111111', name: 'Downtown Route', start_point: 'Warehouse A', end_point: 'Store 1', distance: 15.5, estimated_duration: 45, profiles: { email: 'admin@example.com' } }
+];
+
 export async function getRoutes() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'r1111111-1111-1111-1111-111111111111', name: 'Downtown Route', start_point: 'Warehouse A', end_point: 'Store 1', distance: 15.5, estimated_duration: 45, profiles: { email: 'admin@example.com' } }
-    ];
+    return [...mockRoutesData];
   }
   const { data, error } = await supabase
     .from('routes')
@@ -820,6 +1122,7 @@ export async function updateRoute(id: string, route: any) {
 
 export async function deleteRoute(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockRoutesData = mockRoutesData.filter(r => r.id !== id);
     return;
   }
   const { error } = await supabase.from('routes').delete().eq('id', id);
@@ -827,11 +1130,13 @@ export async function deleteRoute(id: string) {
 }
 
 // Trips
+let mockTripsData = [
+  { id: 't1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', route_id: 'r1111111-1111-1111-1111-111111111111', start_time: new Date().toISOString(), status: 'In Progress', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' }, operators: { name: 'John Doe' }, routes: { name: 'Downtown Route' } }
+];
+
 export async function getTrips() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 't1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', route_id: 'r1111111-1111-1111-1111-111111111111', start_time: new Date().toISOString(), status: 'In Progress', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' }, operators: { name: 'John Doe' }, routes: { name: 'Downtown Route' } }
-    ];
+    return [...mockTripsData];
   }
   const { data, error } = await supabase
     .from('trips')
@@ -902,6 +1207,7 @@ export async function updateTrip(id: string, trip: any) {
 
 export async function deleteTrip(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockTripsData = mockTripsData.filter(t => t.id !== id);
     return;
   }
   const { error } = await supabase.from('trips').delete().eq('id', id);
@@ -909,11 +1215,13 @@ export async function deleteTrip(id: string) {
 }
 
 // Hours of Service
+let mockHoursOfServiceData = [
+  { id: 'h1111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', date: new Date().toISOString().split('T')[0], on_duty_hours: 8, driving_hours: 6, off_duty_hours: 10, sleeper_berth_hours: 0, total_hours: 24, violations: [], operators: { name: 'John Doe' } }
+];
+
 export async function getHoursOfService(operatorId?: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'h1111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', date: new Date().toISOString().split('T')[0], on_duty_hours: 8, driving_hours: 6, off_duty_hours: 10, sleeper_berth_hours: 0, total_hours: 24, violations: [], operators: { name: 'John Doe' } }
-    ];
+    return [...mockHoursOfServiceData];
   }
   let query = supabase
     .from('hours_of_service')
@@ -961,6 +1269,7 @@ export async function updateHoursOfService(id: string, hos: any) {
 
 export async function deleteHoursOfService(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockHoursOfServiceData = mockHoursOfServiceData.filter(h => h.id !== id);
     return;
   }
   const { error } = await supabase.from('hours_of_service').delete().eq('id', id);
@@ -968,11 +1277,13 @@ export async function deleteHoursOfService(id: string) {
 }
 
 // DVIR Reports
+let mockDVIRReportsData = [
+  { id: 'd1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', report_date: new Date().toISOString(), report_type: 'pre_trip', vehicle_condition: 'satisfactory', defects_found: [], equipment: { asset_tag: 'TRK-001' }, operators: { name: 'John Doe' } }
+];
+
 export async function getDVIRReports() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'd1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', operator_id: '00000000-0000-0000-0000-000000000001', report_date: new Date().toISOString(), report_type: 'pre_trip', vehicle_condition: 'satisfactory', defects_found: [], equipment: { asset_tag: 'TRK-001' }, operators: { name: 'John Doe' } }
-    ];
+    return [...mockDVIRReportsData];
   }
   const { data, error } = await supabase
     .from('dvir_reports')
@@ -1035,6 +1346,7 @@ export async function updateDVIRReport(id: string, report: any) {
 
 export async function deleteDVIRReport(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockDVIRReportsData = mockDVIRReportsData.filter(d => d.id !== id);
     return;
   }
   const { error } = await supabase.from('dvir_reports').delete().eq('id', id);
@@ -1042,11 +1354,39 @@ export async function deleteDVIRReport(id: string) {
 }
 
 // Maintenance Schedules
+let mockMaintenanceSchedulesData = [
+  { id: 's1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', service_type: 'Oil Change', maintenance_type: 'preventive', description: 'Regular oil change', frequency_days: 90, last_completed: new Date().toISOString(), next_due: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), status: 'scheduled', assigned_to: 'mock-user-id', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' }, profiles: { email: 'admin@example.com' } }
+];
+
+export async function getAssignedMaintenanceSchedules(userId: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return mockMaintenanceSchedulesData.filter(s => s.assigned_to === userId);
+  }
+  const { data, error } = await supabase
+    .from('maintenance_schedules')
+    .select(`
+      *,
+      equipment (
+        asset_tag,
+        type,
+        model,
+        serial_number
+      ),
+      profiles:assigned_to (
+        email
+      )
+    `)
+    .eq('assigned_to', userId)
+    .eq('status', 'active')
+    .order('next_due', { ascending: true });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function getMaintenanceSchedules() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 's1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', service_type: 'Oil Change', frequency_days: 90, last_completed: new Date().toISOString(), next_due: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), status: 'scheduled', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' }, profiles: { email: 'admin@example.com' } }
-    ];
+    return [...mockMaintenanceSchedulesData];
   }
   const { data, error } = await supabase
     .from('maintenance_schedules')
@@ -1109,6 +1449,7 @@ export async function updateMaintenanceSchedule(id: string, schedule: any) {
 
 export async function deleteMaintenanceSchedule(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockMaintenanceSchedulesData = mockMaintenanceSchedulesData.filter(s => s.id !== id);
     return;
   }
   const { error } = await supabase.from('maintenance_schedules').delete().eq('id', id);
@@ -1116,12 +1457,14 @@ export async function deleteMaintenanceSchedule(id: string) {
 }
 
 // Fuel Efficiency Metrics
+let mockFuelEfficiencyMetricsData = [
+  { id: 'e1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', date: new Date().toISOString(), fuel_consumption: 50, distance_traveled: 400, efficiency_mpg: 8, cost_per_mile: 0.44, equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' } },
+  { id: 'e2222222-2222-2222-2222-222222222222', equipment_id: '33333333-3333-3333-3333-333333333333', date: new Date().toISOString(), fuel_consumption: 15, distance_traveled: 375, efficiency_mpg: 25, cost_per_mile: 0.14, equipment: { asset_tag: 'LV-001', type: 'Light Vehicle' } }
+];
+
 export async function getFuelEfficiencyMetrics(limit = 100) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'e1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', date: new Date().toISOString(), fuel_consumption: 50, distance_traveled: 400, efficiency_mpg: 8, cost_per_mile: 0.44, equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' } },
-      { id: 'e2222222-2222-2222-2222-222222222222', equipment_id: '33333333-3333-3333-3333-333333333333', date: new Date().toISOString(), fuel_consumption: 15, distance_traveled: 375, efficiency_mpg: 25, cost_per_mile: 0.14, equipment: { asset_tag: 'LV-001', type: 'Light Vehicle' } }
-    ];
+    return [...mockFuelEfficiencyMetricsData];
   }
   const { data, error } = await supabase
     .from('fuel_efficiency_metrics')
@@ -1179,6 +1522,7 @@ export async function updateFuelEfficiencyMetric(id: string, metric: any) {
 
 export async function deleteFuelEfficiencyMetric(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockFuelEfficiencyMetricsData = mockFuelEfficiencyMetricsData.filter(m => m.id !== id);
     return;
   }
   const { error } = await supabase.from('fuel_efficiency_metrics').delete().eq('id', id);
@@ -1186,12 +1530,14 @@ export async function deleteFuelEfficiencyMetric(id: string) {
 }
 
 // Utilization Metrics
+let mockUtilizationMetricsData = [
+  { id: '1', equipment_id: '1', date: new Date().toISOString(), total_available_hours: 24, operating_hours: 18, idle_hours: 4, maintenance_hours: 2, utilization_percentage: 75, revenue_generated: 1500, operating_cost: 800, equipment: { id: '1', asset_tag: 'TRK-001', type: 'Dump Truck' } },
+  { id: '2', equipment_id: '2', date: new Date().toISOString(), total_available_hours: 24, operating_hours: 12, idle_hours: 6, maintenance_hours: 6, utilization_percentage: 50, revenue_generated: 2000, operating_cost: 1200, equipment: { id: '2', asset_tag: 'EXC-001', type: 'Excavator' } }
+];
+
 export async function getUtilizationMetrics(limit = 100) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: '1', equipment_id: '1', date: new Date().toISOString(), total_available_hours: 24, operating_hours: 18, idle_hours: 4, maintenance_hours: 2, utilization_percentage: 75, revenue_generated: 1500, operating_cost: 800, equipment: { id: '1', asset_tag: 'TRK-001', type: 'Dump Truck' } },
-      { id: '2', equipment_id: '2', date: new Date().toISOString(), total_available_hours: 24, operating_hours: 12, idle_hours: 6, maintenance_hours: 6, utilization_percentage: 50, revenue_generated: 2000, operating_cost: 1200, equipment: { id: '2', asset_tag: 'EXC-001', type: 'Excavator' } }
-    ];
+    return [...mockUtilizationMetricsData];
   }
   const { data, error } = await supabase
     .from('utilization_metrics')
@@ -1249,6 +1595,7 @@ export async function updateUtilizationMetric(id: string, metric: any) {
 
 export async function deleteUtilizationMetric(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockUtilizationMetricsData = mockUtilizationMetricsData.filter(m => m.id !== id);
     return;
   }
   const { error } = await supabase.from('utilization_metrics').delete().eq('id', id);
@@ -1556,17 +1903,27 @@ export async function updateMaintenanceScheduleFromLog(maintenanceLogId: string)
     if (logError || !maintenanceLog) return;
 
     // Find the corresponding maintenance schedule
-    const { data: schedule, error: scheduleError } = await supabase
+    let query = supabase
       .from('maintenance_schedules')
       .select('*')
       .eq('equipment_id', maintenanceLog.equipment_id)
-      .eq('maintenance_type', maintenanceLog.maintenance_type || 'preventive')
       .eq('status', 'active')
-      .single();
+      .order('next_due', { ascending: true })
+      .limit(1);
+      
+    // Try to match by type if possible, but fall back to any active schedule for this equipment
+    const typeToMatch = maintenanceLog.service_type || maintenanceLog.maintenance_type;
+    if (typeToMatch && ['preventive', 'predictive', 'corrective'].includes(typeToMatch)) {
+      query = query.eq('maintenance_type', typeToMatch);
+    }
+
+    const { data: schedules, error: scheduleError } = await query;
+
+    const schedule = schedules?.[0];
 
     if (scheduleError || !schedule) {
       // No active schedule found, create one if this was preventive maintenance
-      if (maintenanceLog.maintenance_type === 'preventive' || !maintenanceLog.maintenance_type) {
+      if (maintenanceLog.service_type === 'preventive' || maintenanceLog.maintenance_type === 'preventive' || (!maintenanceLog.service_type && !maintenanceLog.maintenance_type)) {
         const settings = await getSettings();
         const nextDue = new Date(maintenanceLog.date);
         nextDue.setDate(nextDue.getDate() + (settings?.preventive_maintenance_interval || 90));
@@ -1578,7 +1935,7 @@ export async function updateMaintenanceScheduleFromLog(maintenanceLogId: string)
           interval_type: 'days',
           interval_value: settings?.preventive_maintenance_interval || 90,
           next_due: nextDue.toISOString(),
-          last_completed: maintenanceLog.date,
+          last_performed: maintenanceLog.date,
           priority: 'medium',
           status: 'active',
           notes: `Auto-created from maintenance log on ${maintenanceLog.date}`
@@ -1600,7 +1957,7 @@ export async function updateMaintenanceScheduleFromLog(maintenanceLogId: string)
     }
 
     await updateMaintenanceSchedule(schedule.id, {
-      last_completed: maintenanceLog.date,
+      last_performed: maintenanceLog.date,
       next_due: nextDue.toISOString(),
       status: 'active' // Reset to active after completion
     });
@@ -1676,12 +2033,13 @@ export async function getEquipmentDetails(id: string) {
       incidents: []
     };
   }
-  const [equipment, fuel, maintenance, repairs, incidents] = await Promise.all([
+  const [equipment, fuel, maintenance, repairs, incidents, fsrAssets] = await Promise.all([
     supabase.from('equipment').select('*, operators(name)').eq('id', id).single(),
     supabase.from('fuel_logs').select('*').eq('equipment_id', id).order('date', { ascending: false }),
     supabase.from('maintenance_logs').select('*').eq('equipment_id', id).order('date', { ascending: false }),
     supabase.from('repair_logs').select('*').eq('equipment_id', id).order('date_reported', { ascending: false }),
     supabase.from('incidents').select('*').eq('equipment_id', id).order('date', { ascending: false }),
+    supabase.from('field_service_report_assets').select('*, field_service_reports(*)').eq('equipment_id', id),
   ]);
 
   if (equipment.error) throw equipment.error;
@@ -1691,7 +2049,8 @@ export async function getEquipmentDetails(id: string) {
     fuel: fuel.data || [],
     maintenance: maintenance.data || [],
     repairs: repairs.data || [],
-    incidents: incidents.data || []
+    incidents: incidents.data || [],
+    fsr: fsrAssets.data?.map((asset: any) => asset.field_service_reports).filter(Boolean) || []
   };
 }
 
@@ -1755,8 +2114,8 @@ export async function getDashboardStats() {
   }));
 
   const fuelLogs = fuelRes.data || [];
-  const totalFuelQuantity = fuelLogs.reduce((sum, log) => sum + Number(log.quantity), 0);
-  const totalFuelCost = fuelLogs.reduce((sum, log) => sum + Number(log.cost), 0);
+  const totalFuelQuantity = fuelLogs.reduce((sum, log) => sum + Number(log.quantity || 0), 0);
+  const totalFuelCost = fuelLogs.reduce((sum, log) => sum + Number(log.cost || 0), 0);
 
   // Calculate Overdue Maintenance (no maintenance in last 90 days)
   const ninetyDaysAgo = new Date();
@@ -1799,8 +2158,8 @@ export async function getEquipmentUnderMaintenance() {
   }
   const { data, error } = await supabase
     .from('equipment')
-    .select('id, asset_tag, type, manufacturer, model, current_location')
-    .eq('status', 'Under Maintenance')
+    .select('id, asset_tag, type, manufacturer, model, current_location, status')
+    .in('status', ['Under Maintenance', 'Repair Required'])
     .order('asset_tag');
   if (error) throw error;
   return data;
@@ -1817,17 +2176,17 @@ export async function getMaintenanceSchedulesWithUnderMaintenance() {
   const underMaintenanceSchedules = underMaintenance.map(equipment => ({
     id: `under-maintenance-${equipment.id}`,
     equipment_id: equipment.id,
-    maintenance_type: 'corrective',
-    description: 'Currently Under Maintenance',
+    maintenance_type: equipment.status === 'Repair Required' ? 'corrective' : 'preventive',
+    description: equipment.status === 'Repair Required' ? 'Pending Repair' : 'Currently Under Maintenance',
     interval_type: 'manual',
     interval_value: 0,
     last_performed: null,
     next_due: new Date().toISOString(), // Due now
-    priority: 'high',
+    priority: equipment.status === 'Repair Required' ? 'high' : 'medium',
     status: 'in_progress',
     assigned_to: null,
     estimated_cost: 0,
-    notes: 'Equipment is currently under maintenance',
+    notes: equipment.status === 'Repair Required' ? 'Equipment requires repair' : 'Equipment is currently under maintenance',
     equipment: {
       asset_tag: equipment.asset_tag,
       type: equipment.type
@@ -1840,12 +2199,14 @@ export async function getMaintenanceSchedulesWithUnderMaintenance() {
 }
 
 // --- Notifications ---
+let mockNotificationsData = [
+  { id: '1', title: 'Maintenance Due', message: 'TRK-001 is due for oil change', type: 'maintenance', read: false, created_at: new Date().toISOString() },
+  { id: '2', title: 'Low Stock', message: 'Brake Pads stock is low', type: 'inventory', read: true, created_at: new Date().toISOString() }
+];
+
 export async function getNotifications() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: '1', title: 'Maintenance Due', message: 'TRK-001 is due for oil change', type: 'maintenance', read: false, created_at: new Date().toISOString() },
-      { id: '2', title: 'Low Stock', message: 'Brake Pads stock is low', type: 'inventory', read: true, created_at: new Date().toISOString() }
-    ];
+    return [...mockNotificationsData];
   }
   const { data, error } = await supabase
     .from('notifications')
@@ -1882,6 +2243,7 @@ export async function markNotificationAsRead(id: string) {
 
 export async function deleteNotification(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockNotificationsData = mockNotificationsData.filter(n => n.id !== id);
     return;
   }
   const { error } = await supabase
@@ -1902,6 +2264,35 @@ export async function getAdminProfiles() {
     .in('role', ['Admin', 'Manager']);
   if (error) throw error;
   return data;
+}
+
+export async function getProfiles() {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [
+      { id: '1', email: 'admin@example.com', role: 'Admin', created_at: new Date().toISOString() },
+      { id: '2', email: 'manager@example.com', role: 'Manager', created_at: new Date().toISOString() },
+      { id: '3', email: 'operator@example.com', role: 'Operator', created_at: new Date().toISOString() }
+    ];
+  }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function updateProfileRole(id: string, role: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return { id, role };
+  }
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ role })
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
 }
 
 // Create maintenance overdue notifications
@@ -1942,12 +2333,14 @@ export async function createMaintenanceOverdueNotifications(overdueEquipment: st
 }
 
 // --- Parts Inventory Management ---
+let mockPartsSuppliersData = [
+  { id: 's1111111-1111-1111-1111-111111111111', name: 'Global Parts Corp', contact_name: 'Mike Wilson', email: 'mike@globalparts.com', phone: '555-0101' },
+  { id: 's2222222-2222-2222-2222-222222222222', name: 'Fleet Supply Co', contact_name: 'Sarah Jones', email: 'sarah@fleetsupply.com', phone: '555-0102' }
+];
+
 export async function getPartsSuppliers() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 's1111111-1111-1111-1111-111111111111', name: 'Global Parts Corp', contact_name: 'Mike Wilson', email: 'mike@globalparts.com', phone: '555-0101' },
-      { id: 's2222222-2222-2222-2222-222222222222', name: 'Fleet Supply Co', contact_name: 'Sarah Jones', email: 'sarah@fleetsupply.com', phone: '555-0102' }
-    ];
+    return [...mockPartsSuppliersData];
   }
   const { data, error } = await supabase
     .from('parts_suppliers')
@@ -1984,6 +2377,7 @@ export async function updatePartsSupplier(id: string, supplier: any) {
 
 export async function deletePartsSupplier(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockPartsSuppliersData = mockPartsSuppliersData.filter(s => s.id !== id);
     return;
   }
   const { error } = await supabase
@@ -1993,12 +2387,14 @@ export async function deletePartsSupplier(id: string) {
   if (error) throw error;
 }
 
+let mockPartsInventoryData = [
+  { id: 'p1111111-1111-1111-1111-111111111111', name: 'Oil Filter', part_number: 'OF-100', current_stock: 25, min_stock: 10, unit_price: 15.50, parts_suppliers: { name: 'Global Parts Corp' } },
+  { id: 'p2222222-2222-2222-2222-222222222222', name: 'Brake Pads', part_number: 'BP-200', current_stock: 5, min_stock: 8, unit_price: 85.00, parts_suppliers: { name: 'Fleet Supply Co' } }
+];
+
 export async function getPartsInventory() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
-    return [
-      { id: 'p1111111-1111-1111-1111-111111111111', name: 'Oil Filter', part_number: 'OF-100', current_stock: 25, min_stock: 10, unit_price: 15.50, parts_suppliers: { name: 'Global Parts Corp' } },
-      { id: 'p2222222-2222-2222-2222-222222222222', name: 'Brake Pads', part_number: 'BP-200', current_stock: 5, min_stock: 8, unit_price: 85.00, parts_suppliers: { name: 'Fleet Supply Co' } }
-    ];
+    return [...mockPartsInventoryData];
   }
   const { data, error } = await supabase
     .from('parts_inventory')
@@ -2052,6 +2448,7 @@ export async function updatePart(id: string, part: any) {
 
 export async function deletePart(id: string) {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockPartsInventoryData = mockPartsInventoryData.filter(p => p.id !== id);
     return;
   }
   const { error } = await supabase
@@ -2354,7 +2751,7 @@ export async function getMaintenanceWorkload() {
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('*')
-    .in('role', ['Admin', 'Manager']);
+    .in('role', ['Admin', 'Manager', 'Technician']);
   if (profilesError) throw profilesError;
 
   // Get maintenance schedules assigned to each person
@@ -2909,5 +3306,206 @@ export async function getPeerComparison(operatorId: string) {
     betterThan,
     worseThan: sortedScores.length - betterThan - 1
   };
+}
+
+// --- Field Service Reports ---
+export async function createFieldServiceReport(report: any, assets: any[], parts: any[], scheduleId?: string) {
+  // Sanitize empty strings to null
+  const sanitize = (obj: any) => {
+    const newObj = { ...obj };
+    Object.keys(newObj).forEach(key => {
+      if (newObj[key] === '') newObj[key] = null;
+    });
+    return newObj;
+  };
+
+  const sanitizedReport = sanitize(report);
+  if (scheduleId) {
+    sanitizedReport.schedule_id = scheduleId;
+  }
+  const sanitizedAssets = assets.map(sanitize);
+  const sanitizedParts = parts.map(sanitize);
+
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return { id: 'mock-report-id', ...sanitizedReport };
+  }
+
+  const { data: reportData, error: reportError } = await supabase
+    .from('field_service_reports')
+    .insert([sanitizedReport])
+    .select()
+    .single();
+
+  if (reportError) throw reportError;
+
+  const reportId = reportData.id;
+
+  // Insert assets
+  if (sanitizedAssets.length > 0) {
+    const assetsToInsert = sanitizedAssets.map(asset => ({
+      ...asset,
+      report_id: reportId
+    }));
+    const { error: assetsError } = await supabase
+      .from('field_service_report_assets')
+      .insert(assetsToInsert);
+    if (assetsError) throw assetsError;
+
+    // Create maintenance/repair logs for each asset
+    for (const asset of sanitizedAssets) {
+      if (sanitizedReport.job_type === 'PM') {
+        await createMaintenanceLog({
+          equipment_id: asset.equipment_id,
+          service_type: 'routine',
+          date: new Date(sanitizedReport.report_date).toISOString(),
+          cost: 0,
+          notes: sanitizedReport.job_description,
+          workplace: sanitizedReport.workplace,
+          index_value: asset.index_value,
+          next_service_date: asset.next_service_date,
+          status: 'completed'
+        }, [], scheduleId);
+      } else if (sanitizedReport.job_type === 'RP' || sanitizedReport.job_type === 'BD') {
+        await createRepairLog({
+          equipment_id: asset.equipment_id,
+          issue_description: sanitizedReport.job_description,
+          action_taken: sanitizedReport.action_taken,
+          workplace: sanitizedReport.workplace,
+          index_value: asset.index_value,
+          date_reported: new Date(sanitizedReport.report_date).toISOString(),
+          status: 'completed',
+          cost: 0
+        }, scheduleId);
+      }
+    }
+  }
+
+  // Insert parts
+  if (sanitizedParts.length > 0) {
+    const partsToInsert = sanitizedParts.map(part => ({
+      ...part,
+      report_id: reportId
+    }));
+    const { error: partsError } = await supabase
+      .from('field_service_report_parts')
+      .insert(partsToInsert);
+    if (partsError) throw partsError;
+  }
+
+  return reportData;
+}
+
+export async function updateFieldServiceReport(id: string, report: any, assets: any[], parts: any[]) {
+  // Sanitize empty strings to null
+  const sanitize = (obj: any) => {
+    const newObj = { ...obj };
+    Object.keys(newObj).forEach(key => {
+      if (newObj[key] === '') newObj[key] = null;
+    });
+    return newObj;
+  };
+
+  const sanitizedReport = sanitize(report);
+  const sanitizedAssets = assets.map(sanitize);
+  const sanitizedParts = parts.map(sanitize);
+
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return { id, ...sanitizedReport };
+  }
+
+  // Update report
+  const { data: reportData, error: reportError } = await supabase
+    .from('field_service_reports')
+    .update(sanitizedReport)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (reportError) throw reportError;
+
+  // Delete existing assets and parts
+  await supabase.from('field_service_report_assets').delete().eq('report_id', id);
+  await supabase.from('field_service_report_parts').delete().eq('report_id', id);
+
+  // Insert new assets
+  if (sanitizedAssets.length > 0) {
+    const assetsToInsert = sanitizedAssets.map(asset => ({
+      ...asset,
+      report_id: id
+    }));
+    const { error: assetsError } = await supabase
+      .from('field_service_report_assets')
+      .insert(assetsToInsert);
+    if (assetsError) throw assetsError;
+  }
+
+  // Insert new parts
+  if (sanitizedParts.length > 0) {
+    const partsToInsert = sanitizedParts.map(part => ({
+      ...part,
+      report_id: id
+    }));
+    const { error: partsError } = await supabase
+      .from('field_service_report_parts')
+      .insert(partsToInsert);
+    if (partsError) throw partsError;
+  }
+
+  return reportData;
+}
+
+export async function deleteFieldServiceReport(id: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return true;
+  }
+
+  const { error } = await supabase
+    .from('field_service_reports')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
+}
+
+export async function getFieldServiceReports() {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('field_service_reports')
+    .select(`
+      *,
+      field_service_report_assets (
+        *,
+        equipment (asset_tag, model)
+      ),
+      field_service_report_parts (*)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getFieldServiceReport(id: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return null;
+  }
+  const { data, error } = await supabase
+    .from('field_service_reports')
+    .select(`
+      *,
+      field_service_report_assets (
+        *,
+        equipment (*)
+      ),
+      field_service_report_parts (*)
+    `)
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 

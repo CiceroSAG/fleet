@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getRepairLogs, getEquipment, deleteRepairLog } from '../lib/api';
 import { Plus, Search, AlertCircle, Wrench, Clock, CheckCircle2, MoreVertical, Trash2, Edit2 } from 'lucide-react';
 import RepairLogForm from '../components/RepairLogForm';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function Repairs() {
   const queryClient = useQueryClient();
@@ -10,6 +11,7 @@ export default function Repairs() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: logs, isLoading } = useQuery({
     queryKey: ['repairLogs'],
@@ -32,7 +34,7 @@ export default function Repairs() {
 
   const filteredLogs = logs?.filter(log => {
     const equip = equipment?.find(e => e.id === log.equipment_id);
-    const searchStr = `${equip?.asset_tag} ${log.repair_type} ${log.description}`.toLowerCase();
+    const searchStr = `${equip?.asset_tag} ${log.repair_type} ${log.issue_description}`.toLowerCase();
     return searchStr.includes(searchTerm.toLowerCase());
   });
 
@@ -43,8 +45,13 @@ export default function Repairs() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this repair log?')) {
-      deleteMutation.mutate(id);
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -176,6 +183,14 @@ export default function Repairs() {
           }}
         />
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Repair Log"
+        message="Are you sure you want to delete this repair log?"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

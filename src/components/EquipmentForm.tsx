@@ -80,7 +80,17 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    mutation.mutate(formData);
+    
+    const dataToSubmit = {
+      ...formData,
+      category_id: formData.category_id || null,
+      assigned_operator_id: formData.assigned_operator_id || null,
+      purchase_date: formData.purchase_date || null,
+      warranty_start_date: formData.warranty_start_date || null,
+      warranty_end_date: formData.warranty_end_date || null,
+    };
+    
+    mutation.mutate(dataToSubmit);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

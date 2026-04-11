@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getEquipmentDetails, getSettings } from '@/lib/api';
-import { ArrowLeft, Fuel, Wrench, AlertTriangle, Settings, DollarSign } from 'lucide-react';
+import { ArrowLeft, Fuel, Wrench, AlertTriangle, Settings, DollarSign, FileText } from 'lucide-react';
 import { getCurrencySymbol } from '@/lib/utils';
 
 export default function EquipmentDetails() {
@@ -28,7 +28,7 @@ export default function EquipmentDetails() {
     return <div className="p-8 text-center text-red-500">Error loading equipment details.</div>;
   }
 
-  const { equipment, fuel, maintenance, repairs, incidents } = data;
+  const { equipment, fuel, maintenance, repairs, incidents, fsr } = data;
 
   // Calculate Total Cost of Ownership (TCO)
   const totalFuelCost = fuel?.reduce((sum: number, f: any) => sum + Number(f.cost || 0), 0) || 0;
@@ -41,7 +41,8 @@ export default function EquipmentDetails() {
     ...fuel.map((f: any) => ({ ...f, type: 'fuel', dateStr: f.date })),
     ...maintenance.map((m: any) => ({ ...m, type: 'maintenance', dateStr: m.date })),
     ...repairs.map((r: any) => ({ ...r, type: 'repair', dateStr: r.date_reported })),
-    ...incidents.map((i: any) => ({ ...i, type: 'incident', dateStr: i.date }))
+    ...incidents.map((i: any) => ({ ...i, type: 'incident', dateStr: i.date })),
+    ...(fsr || []).map((f: any) => ({ ...f, type: 'fsr', dateStr: f.report_date }))
   ].sort((a, b) => new Date(b.dateStr).getTime() - new Date(a.dateStr).getTime());
 
   return (
@@ -178,11 +179,13 @@ export default function EquipmentDetails() {
                         event.type === 'fuel' ? 'bg-blue-500' :
                         event.type === 'maintenance' ? 'bg-purple-500' :
                         event.type === 'repair' ? 'bg-yellow-500' :
+                        event.type === 'fsr' ? 'bg-orange-500' :
                         'bg-red-500'
                       }`}>
                         {event.type === 'fuel' && <Fuel className="h-4 w-4 text-white" />}
                         {event.type === 'maintenance' && <Settings className="h-4 w-4 text-white" />}
                         {event.type === 'repair' && <Wrench className="h-4 w-4 text-white" />}
+                        {event.type === 'fsr' && <FileText className="h-4 w-4 text-white" />}
                         {event.type === 'incident' && <AlertTriangle className="h-4 w-4 text-white" />}
                       </span>
                     </div>
@@ -192,6 +195,7 @@ export default function EquipmentDetails() {
                           {event.type === 'fuel' && <>Added <span className="font-medium text-gray-900">{event.quantity}L</span> of fuel ({currencySymbol}{event.cost})</>}
                           {event.type === 'maintenance' && <><span className="font-medium text-gray-900 capitalize">{event.service_type}</span> maintenance performed ({currencySymbol}{event.cost})</>}
                           {event.type === 'repair' && <>Repair logged: <span className="font-medium text-gray-900">{event.issue_description}</span></>}
+                          {event.type === 'fsr' && <>Field Service Report: <span className="font-medium text-gray-900">{event.job_type}</span> - {event.workplace}</>}
                           {event.type === 'incident' && <>Incident reported: <span className="font-medium text-gray-900">{event.type_of_damage}</span> (Severity: {event.severity})</>}
                         </p>
                         {(event.notes || event.odometer || event.odometer_reading) && (

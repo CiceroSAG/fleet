@@ -55,9 +55,9 @@ export default function PartForm({ part, onClose }: PartFormProps) {
     setError(null);
     mutation.mutate({
       ...formData,
-      quantity: parseInt(formData.quantity),
-      min_quantity: parseInt(formData.min_quantity),
-      unit_cost: parseFloat(formData.unit_cost),
+      quantity: parseInt(formData.quantity) || 0,
+      min_quantity: parseInt(formData.min_quantity) || 0,
+      unit_cost: parseFloat(formData.unit_cost) || 0,
     });
   };
 

@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 type Profile = {
   id: string;
   email: string;
-  role: 'Admin' | 'Manager' | 'Operator';
+  role: 'Admin' | 'Manager' | 'Operator' | 'Technician';
 };
 
 type AuthContextType = {

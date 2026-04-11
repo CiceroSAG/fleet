@@ -50,7 +50,13 @@ export default function OperatorForm({ operator, onClose }: OperatorFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    mutation.mutate(formData);
+    
+    const dataToSubmit = {
+      ...formData,
+      license_expiry: formData.license_expiry || null,
+    };
+    
+    mutation.mutate(dataToSubmit);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

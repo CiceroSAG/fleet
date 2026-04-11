@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getOperators, deleteOperator } from '../lib/api';
 import { Plus, Search, User, Mail, Phone, MoreVertical, ShieldCheck, Clock, Edit2, Trash2 } from 'lucide-react';
 import OperatorForm from '../components/OperatorForm';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function OperatorsList() {
   const queryClient = useQueryClient();
@@ -10,6 +11,7 @@ export default function OperatorsList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOperator, setSelectedOperator] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: operators, isLoading } = useQuery({
     queryKey: ['operators'],
@@ -36,8 +38,13 @@ export default function OperatorsList() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this operator? This action cannot be undone.')) {
-      deleteMutation.mutate(id);
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -162,6 +169,14 @@ export default function OperatorsList() {
           }}
         />
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Operator"
+        message="Are you sure you want to delete this operator? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

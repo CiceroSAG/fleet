@@ -40,7 +40,7 @@ export default function Reports() {
     const costs: Record<string, number> = {};
     fuelLogs.forEach((log: any) => {
       const tag = log.equipment?.asset_tag || 'Unknown';
-      costs[tag] = (costs[tag] || 0) + Number(log.cost);
+      costs[tag] = (costs[tag] || 0) + Number(log.cost || 0);
     });
     return Object.entries(costs)
       .map(([name, cost]) => ({ name, cost }))
@@ -53,7 +53,7 @@ export default function Reports() {
     const costs: Record<string, number> = {};
     maintenance.forEach((log: any) => {
       const tag = log.equipment?.asset_tag || 'Unknown';
-      costs[tag] = (costs[tag] || 0) + Number(log.cost);
+      costs[tag] = (costs[tag] || 0) + Number(log.cost || 0);
     });
     return Object.entries(costs)
       .map(([name, cost]) => ({ name, cost }))

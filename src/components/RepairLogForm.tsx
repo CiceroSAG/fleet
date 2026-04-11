@@ -5,20 +5,24 @@ import { X, Save, AlertCircle } from 'lucide-react';
 
 interface RepairLogFormProps {
   log?: any;
+  schedule?: any;
   onClose: () => void;
 }
 
-export default function RepairLogForm({ log, onClose }: RepairLogFormProps) {
+export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormProps) {
   const queryClient = useQueryClient();
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
 
   const [formData, setFormData] = useState({
-    equipment_id: '',
+    equipment_id: schedule?.equipment_id || '',
     repair_type: 'mechanical',
     date_reported: new Date().toISOString().split('T')[0],
-    cost: 0,
-    status: 'in_progress',
-    description: '',
+    cost: schedule?.estimated_cost || 0,
+    status: 'completed', // Default to completed if coming from schedule
+    issue_description: schedule?.notes || '',
+    action_taken: '',
+    workplace: '',
+    index_value: '',
   });
 
   useEffect(() => {
@@ -29,18 +33,33 @@ export default function RepairLogForm({ log, onClose }: RepairLogFormProps) {
         date_reported: log.date_reported ? new Date(log.date_reported).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         cost: log.cost || 0,
         status: log.status || 'in_progress',
-        description: log.description || '',
+        issue_description: log.issue_description || '',
+        action_taken: log.action_taken || '',
+        workplace: log.workplace || '',
+        index_value: log.index_value?.toString() || '',
       });
+    } else if (schedule) {
+      setFormData(prev => ({
+        ...prev,
+        equipment_id: schedule.equipment_id || '',
+        cost: schedule.estimated_cost || 0,
+        issue_description: schedule.notes || '',
+        status: 'completed',
+        action_taken: '',
+        workplace: '',
+        index_value: '',
+      }));
     }
-  }, [log]);
+  }, [log, schedule]);
 
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => log ? updateRepairLog(log.id, data) : createRepairLog(data),
+    mutationFn: (data: any) => log ? updateRepairLog(log.id, data) : createRepairLog(data, schedule?.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repairLogs'] });
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['maintenanceSchedules'] });
       onClose();
     },
     onError: (err: any) => {
@@ -59,7 +78,7 @@ export default function RepairLogForm({ log, onClose }: RepairLogFormProps) {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'cost' ? parseFloat(value) || 0 : value,
+      [name]: name === 'cost' || name === 'index_value' ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -158,15 +177,52 @@ export default function RepairLogForm({ log, onClose }: RepairLogFormProps) {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Index Value (Hours/KM)</label>
+                <input
+                  type="number"
+                  name="index_value"
+                  value={formData.index_value}
+                  onChange={handleChange}
+                  placeholder="Current reading"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Workplace</label>
+                <input
+                  type="text"
+                  name="workplace"
+                  value={formData.workplace}
+                  onChange={handleChange}
+                  placeholder="Location"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Issue Description</label>
               <textarea
-                name="description"
-                value={formData.description}
+                name="issue_description"
+                value={formData.issue_description}
                 onChange={handleChange}
-                rows={3}
+                rows={2}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
-                placeholder="Describe the issue or repair needed..."
+                placeholder="Describe the issue..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Action Taken / Work Done</label>
+              <textarea
+                name="action_taken"
+                value={formData.action_taken}
+                onChange={handleChange}
+                rows={2}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                placeholder="Describe the work performed..."
               />
             </div>
           </div>

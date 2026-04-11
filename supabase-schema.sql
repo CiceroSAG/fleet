@@ -103,6 +103,14 @@ CREATE TABLE maintenance_logs (
   date TIMESTAMP WITH TIME ZONE NOT NULL,
   cost NUMERIC NOT NULL,
   notes TEXT,
+  workplace TEXT,
+  index_value NUMERIC,
+  next_service_date DATE,
+  status TEXT DEFAULT 'scheduled', -- scheduled, in_progress, completed
+  approval_status TEXT DEFAULT 'pending', -- pending, approved, rejected
+  approved_by UUID REFERENCES profiles(id),
+  approved_at TIMESTAMP WITH TIME ZONE,
+  schedule_id UUID REFERENCES maintenance_schedules(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -110,9 +118,13 @@ CREATE TABLE repair_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   equipment_id UUID REFERENCES equipment(id) NOT NULL,
   issue_description TEXT NOT NULL,
+  action_taken TEXT,
+  workplace TEXT,
+  index_value NUMERIC,
   date_reported TIMESTAMP WITH TIME ZONE NOT NULL,
   status TEXT NOT NULL DEFAULT 'Pending', -- Pending, In Progress, Completed
   cost NUMERIC,
+  schedule_id UUID REFERENCES maintenance_schedules(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -129,6 +141,26 @@ CREATE TABLE incidents (
 );
 
 -- 4. Advanced Fleet Management Tables
+
+-- Maintenance Technicians Mapping
+CREATE TABLE maintenance_technicians (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  maintenance_log_id UUID REFERENCES maintenance_logs(id) ON DELETE CASCADE,
+  technician_id UUID REFERENCES technicians(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE maintenance_technicians ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow read access to authenticated users" ON maintenance_technicians FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow all access to Admins and Managers" ON maintenance_technicians FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
+);
+CREATE POLICY "Allow Technicians to insert maintenance_technicians" ON maintenance_technicians FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'Technician')
+);
+CREATE POLICY "Allow Technicians to delete maintenance_technicians" ON maintenance_technicians FOR DELETE TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'Technician')
+);
 
 -- GPS Tracking and Telematics
 CREATE TABLE vehicle_locations (
@@ -340,8 +372,33 @@ ALTER TABLE maintenance_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE repair_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
 
+-- Function to check if current user is admin or manager (bypasses RLS to avoid infinite recursion)
+CREATE OR REPLACE FUNCTION public.is_admin_or_manager()
+RETURNS BOOLEAN AS $$
+DECLARE
+  user_role TEXT;
+BEGIN
+  SELECT role INTO user_role FROM public.profiles WHERE id = auth.uid();
+  RETURN user_role IN ('Admin', 'Manager');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+DECLARE
+  user_role TEXT;
+BEGIN
+  SELECT role INTO user_role FROM public.profiles WHERE id = auth.uid();
+  RETURN user_role = 'Admin';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Profiles: Users can read their own profile
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+
+-- Profiles: Admins and Managers can view all profiles
+CREATE POLICY "Admins and Managers can view all profiles" ON profiles FOR SELECT USING (public.is_admin_or_manager());
+CREATE POLICY "Admins can update all profiles" ON profiles FOR UPDATE USING (public.is_admin());
 
 -- Generic Policies for MVP: Authenticated users can read everything
 CREATE POLICY "Allow read access to authenticated users" ON settings FOR SELECT TO authenticated USING (true);
@@ -368,6 +425,12 @@ CREATE POLICY "Allow all access to Admins and Managers" ON equipment FOR ALL TO 
 );
 CREATE POLICY "Allow all access to Admins and Managers" ON maintenance_logs FOR ALL TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
+);
+CREATE POLICY "Allow Technicians to insert maintenance logs" ON maintenance_logs FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'Technician')
+);
+CREATE POLICY "Allow Technicians to update maintenance logs" ON maintenance_logs FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'Technician')
 );
 CREATE POLICY "Allow all access to Admins and Managers" ON repair_logs FOR ALL TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('Admin', 'Manager'))
@@ -487,3 +550,62 @@ CREATE POLICY "Allow all access to Admins and Managers" ON equipment_parts_mappi
 
 -- Dashboard Configs: Users can manage their own configs
 CREATE POLICY "Users can manage own dashboard config" ON dashboard_configs FOR ALL TO authenticated USING (user_id = auth.uid());
+
+-- Field Service Reports
+CREATE TABLE field_service_reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workplace TEXT,
+  job_type TEXT, -- BD, PM, RP, SAF
+  job_description TEXT,
+  action_taken TEXT,
+  technician_name TEXT,
+  supervisor_name TEXT,
+  manager_name TEXT,
+  kamoa_hod_name TEXT,
+  supervisor_date DATE,
+  manager_date DATE,
+  kamoa_hod_date DATE,
+  technician_id UUID REFERENCES profiles(id),
+  schedule_id UUID REFERENCES maintenance_schedules(id),
+  report_date DATE DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE field_service_report_assets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id UUID REFERENCES field_service_reports(id) ON DELETE CASCADE,
+  equipment_id UUID REFERENCES equipment(id),
+  index_value NUMERIC,
+  next_service_date DATE
+);
+
+CREATE TABLE field_service_report_parts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id UUID REFERENCES field_service_reports(id) ON DELETE CASCADE,
+  part_description TEXT,
+  quantity_used INTEGER,
+  remark TEXT
+);
+
+-- Enable RLS and add policies for the new tables
+ALTER TABLE field_service_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE field_service_report_assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE field_service_report_parts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow read access to authenticated users" ON field_service_reports FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow all access to authenticated users" ON field_service_reports FOR ALL TO authenticated USING (true);
+
+CREATE POLICY "Allow read access to authenticated users" ON field_service_report_assets FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow all access to authenticated users" ON field_service_report_assets FOR ALL TO authenticated USING (true);
+
+CREATE POLICY "Allow read access to authenticated users" ON field_service_report_parts FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow all access to authenticated users" ON field_service_report_parts FOR ALL TO authenticated USING (true);
+
+-- Storage Bucket for Company Assets (Logos, etc)
+INSERT INTO storage.buckets (id, name, public) VALUES ('company-assets', 'company-assets', true) ON CONFLICT (id) DO NOTHING;
+
+-- Storage Policies for company-assets
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'company-assets');
+CREATE POLICY "Authenticated users can upload" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'company-assets');
+CREATE POLICY "Authenticated users can update" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'company-assets');
+CREATE POLICY "Authenticated users can delete" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'company-assets');

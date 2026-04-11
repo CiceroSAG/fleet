@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getMaintenanceSchedulesWithUnderMaintenance, getMaintenanceWorkload, autoAssignMaintenance, checkPartsAvailability, getMaintenanceOptimization } from '@/lib/api';
-import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap } from 'lucide-react';
+import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap, Plus, Edit2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import MaintenanceScheduleForm from '@/components/MaintenanceScheduleForm';
+import MaintenanceForm from '@/components/MaintenanceForm';
+import RepairLogForm from '@/components/RepairLogForm';
 
 interface MaintenanceSchedule {
   id: string;
@@ -35,6 +38,9 @@ export default function MaintenanceScheduling() {
     priority: 'all',
     type: 'all'
   });
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
+  const [completingSchedule, setCompletingSchedule] = useState<any>(null);
 
   const queryClient = useQueryClient();
 
@@ -202,12 +208,24 @@ export default function MaintenanceScheduling() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Maintenance Scheduling</h1>
-        <button
-          onClick={fetchMaintenanceSchedules}
-          className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700"
-        >
-          Refresh
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => {
+              setSelectedSchedule(null);
+              setIsFormOpen(true);
+            }}
+            className="flex items-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add Schedule</span>
+          </button>
+          <button
+            onClick={fetchMaintenanceSchedules}
+            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -435,8 +453,20 @@ export default function MaintenanceScheduling() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {!schedule.assigned_to && schedule.status === 'active' && (
+                      <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+                        {!schedule.id.startsWith('under-maintenance-') && (
+                          <button
+                            onClick={() => {
+                              setSelectedSchedule(schedule);
+                              setIsFormOpen(true);
+                            }}
+                            className="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200 flex items-center"
+                          >
+                            <Edit2 className="h-3 w-3 mr-1" />
+                            Edit
+                          </button>
+                        )}
+                      {!schedule.assigned_to && schedule.status === 'active' && !schedule.id.startsWith('under-maintenance-') && (
                         <button
                           onClick={() => autoAssignMutation.mutate(schedule.id)}
                           disabled={autoAssignMutation.isPending}
@@ -456,15 +486,15 @@ export default function MaintenanceScheduling() {
                           {partsCheckMutation.isPending ? 'Checking...' : 'Check Parts'}
                         </button>
                       )}
-                      {schedule.status === 'active' && (
+                      {(schedule.status === 'active' || schedule.status === 'in_progress' || schedule.id.startsWith('under-maintenance-')) && (
                         <button
-                          onClick={() => updateScheduleStatus(schedule.id, 'completed')}
+                          onClick={() => setCompletingSchedule(schedule)}
                           className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
                         >
                           Mark Complete
                         </button>
                       )}
-                      {schedule.status !== 'cancelled' && (
+                      {schedule.status !== 'cancelled' && !schedule.id.startsWith('under-maintenance-') && (
                         <button
                           onClick={() => updateScheduleStatus(schedule.id, 'cancelled')}
                           className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
@@ -480,6 +510,34 @@ export default function MaintenanceScheduling() {
           </div>
         </div>
       </div>
+      {isFormOpen && (
+        <MaintenanceScheduleForm
+          schedule={selectedSchedule}
+          onClose={() => {
+            setIsFormOpen(false);
+            setSelectedSchedule(null);
+          }}
+        />
+      )}
+      {completingSchedule && (
+        completingSchedule.maintenance_type === 'corrective' || completingSchedule.notes === 'Equipment requires repair' ? (
+          <RepairLogForm
+            schedule={completingSchedule}
+            onClose={() => {
+              setCompletingSchedule(null);
+              fetchMaintenanceSchedules();
+            }}
+          />
+        ) : (
+          <MaintenanceForm
+            schedule={completingSchedule}
+            onClose={() => {
+              setCompletingSchedule(null);
+              fetchMaintenanceSchedules();
+            }}
+          />
+        )
+      )}
     </div>
   );
 }

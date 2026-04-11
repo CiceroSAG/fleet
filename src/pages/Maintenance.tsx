@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getMaintenanceLogs, getEquipment, deleteMaintenanceLog } from '../lib/api';
-import { Plus, Search, Calendar, Wrench, CheckCircle2, Clock, AlertTriangle, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { getMaintenanceLogs, getEquipment, deleteMaintenanceLog, getTechnicianByUserId, approveMaintenanceLog } from '../lib/api';
+import { Plus, Search, Calendar, Wrench, CheckCircle2, Clock, AlertTriangle, MoreVertical, Edit2, Trash2, ShieldCheck } from 'lucide-react';
 import MaintenanceForm from '../components/MaintenanceForm';
+import ConfirmModal from '../components/ConfirmModal';
+import { useAuth } from '../lib/auth';
 
 export default function Maintenance() {
+  const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [approveId, setApproveId] = useState<string | null>(null);
+
+  const { data: technicianRecord } = useQuery({
+    queryKey: ['technicianRecord', profile?.id],
+    queryFn: () => profile?.id ? getTechnicianByUserId(profile.id) : null,
+    enabled: profile?.role === 'Technician',
+  });
 
   const { data: logs, isLoading } = useQuery({
     queryKey: ['maintenanceLogs'],
@@ -28,9 +39,31 @@ export default function Maintenance() {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       setOpenMenuId(null);
     },
+    onError: (error: any) => {
+      console.error('Delete error:', error);
+      alert(`Failed to delete: ${error.message}`);
+    }
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: approveMaintenanceLog,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenanceLogs'] });
+      setOpenMenuId(null);
+    },
+    onError: (error: any) => {
+      console.error('Approve error:', error);
+      alert(`Failed to approve: ${error.message}`);
+    }
   });
 
   const filteredLogs = logs?.filter(log => {
+    // If technician, only show assigned logs
+    if (profile?.role === 'Technician' && technicianRecord) {
+      const isAssigned = log.maintenance_technicians?.some((mt: any) => mt.technician_id === technicianRecord.id);
+      if (!isAssigned) return false;
+    }
+
     const equip = equipment?.find(e => e.id === log.equipment_id);
     const searchStr = `${equip?.asset_tag} ${log.service_type} ${log.description}`.toLowerCase();
     return searchStr.includes(searchTerm.toLowerCase());
@@ -43,8 +76,24 @@ export default function Maintenance() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this maintenance log?')) {
-      deleteMutation.mutate(id);
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
+    }
+  };
+
+  const handleApprove = (id: string) => {
+    setApproveId(id);
+  };
+
+  const confirmApprove = () => {
+    if (approveId) {
+      approveMutation.mutate(approveId);
+      setApproveId(null);
     }
   };
 
@@ -121,15 +170,19 @@ export default function Maintenance() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Technicians</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approval</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredLogs?.map((log) => {
                 const equip = equipment?.find(e => e.id === log.equipment_id);
+                const techs = log.maintenance_technicians?.map((mt: any) => mt.technicians?.name).filter(Boolean) || [];
+                
                 return (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -141,6 +194,19 @@ export default function Maintenance() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{(log.service_type || '').replace('_', ' ')}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        {techs.length > 0 ? (
+                          techs.map((name: string, i: number) => (
+                            <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                              {name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">None assigned</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(log.date).toLocaleDateString()}
                     </td>
@@ -159,6 +225,19 @@ export default function Maintenance() {
                         <span className="text-sm text-gray-700 capitalize">{(log.status || '').replace('_', ' ')}</span>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {log.approval_status === 'approved' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <ShieldCheck className="w-3 h-3 mr-1" />
+                          Approved
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <Clock className="w-3 h-3 mr-1" />
+                          Pending
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="relative">
                         <button 
@@ -169,20 +248,33 @@ export default function Maintenance() {
                         </button>
                         {openMenuId === log.id && (
                           <div className="absolute right-0 top-8 w-36 bg-white rounded-lg shadow-lg border border-gray-100 z-10 py-1">
-                            <button
-                              onClick={() => handleEdit(log)}
-                              className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                            >
-                              <Edit2 className="w-4 h-4 text-blue-600" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDelete(log.id)}
-                              className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              <span>Delete</span>
-                            </button>
+                            {profile?.role !== 'Technician' && log.approval_status !== 'approved' && (
+                              <button
+                                onClick={() => handleApprove(log.id)}
+                                className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors text-left"
+                              >
+                                <ShieldCheck className="w-4 h-4" />
+                                <span>Approve</span>
+                              </button>
+                            )}
+                            {!(profile?.role === 'Technician' && log.approval_status === 'approved') && (
+                              <button
+                                onClick={() => handleEdit(log)}
+                                className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                              >
+                                <Edit2 className="w-4 h-4 text-blue-600" />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            {profile?.role !== 'Technician' && (
+                              <button
+                                onClick={() => handleDelete(log.id)}
+                                className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Delete</span>
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -210,6 +302,22 @@ export default function Maintenance() {
           }}
         />
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Maintenance Log"
+        message="Are you sure you want to delete this maintenance log?"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
+      <ConfirmModal
+        isOpen={!!approveId}
+        title="Approve Maintenance Report"
+        message="Are you sure you want to approve this maintenance report?"
+        confirmText="Approve"
+        onConfirm={confirmApprove}
+        onCancel={() => setApproveId(null)}
+      />
     </div>
   );
 }

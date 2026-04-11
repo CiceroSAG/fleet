@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { useQuery } from '@tanstack/react-query';
+import { getSettings } from '../lib/api';
 import { 
   LayoutDashboard, Truck, Users, Fuel, Settings, LogOut, 
   ClipboardList, Wrench, AlertTriangle, FileText, Package, 
@@ -9,10 +11,15 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function Layout() {
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings,
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -22,32 +29,55 @@ export default function Layout() {
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/equipment', icon: Truck, label: 'Equipment' },
-    { to: '/operators', icon: Users, label: 'Operators' },
-    { to: '/fuel', icon: Fuel, label: 'Fuel Logs' },
-    { to: '/parts', icon: Package, label: 'Parts Inventory' },
-    { to: '/maintenance', icon: ClipboardList, label: 'Maintenance' },
-    { to: '/repairs', icon: Wrench, label: 'Repairs' },
-    { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
-    { to: '/tracking', icon: Map, label: 'Real-Time Tracking' },
-    { to: '/driver-behavior', icon: Activity, label: 'Driver Behavior' },
-    { to: '/fuel-management', icon: Fuel, label: 'Fuel Management' },
-    { to: '/maintenance-scheduling', icon: ClipboardList, label: 'Scheduling' },
-    { to: '/compliance', icon: FileText, label: 'Compliance' },
-    { to: '/utilization', icon: Activity, label: 'Utilization' },
-    { to: '/reports', icon: FileText, label: 'Reports' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/operators', icon: Users, label: 'Operators', roles: ['Admin', 'Manager'] },
+    { to: '/fuel', icon: Fuel, label: 'Fuel Logs', feature: 'fuel_logs', roles: ['Admin', 'Manager', 'Operator'] },
+    { to: '/parts', icon: Package, label: 'Parts Inventory', feature: 'parts', roles: ['Admin', 'Manager', 'Technician'] },
+    { to: '/maintenance', icon: ClipboardList, label: 'Maintenance', feature: 'maintenance', roles: ['Admin', 'Manager', 'Technician'] },
+    { to: '/repairs', icon: Wrench, label: 'Repairs', feature: 'repairs', roles: ['Admin', 'Manager', 'Technician'] },
+    { to: '/incidents', icon: AlertTriangle, label: 'Incidents', feature: 'incidents' },
+    { to: '/tracking', icon: Map, label: 'Real-Time Tracking', feature: 'tracking', roles: ['Admin', 'Manager', 'Operator'] },
+    { to: '/driver-behavior', icon: Activity, label: 'Driver Behavior', feature: 'driver_behavior', roles: ['Admin', 'Manager', 'Operator'] },
+    { to: '/fuel-management', icon: Fuel, label: 'Fuel Management', feature: 'fuel_management', roles: ['Admin', 'Manager'] },
+    { to: '/maintenance-scheduling', icon: ClipboardList, label: 'Scheduling', feature: 'scheduling', roles: ['Admin', 'Manager'] },
+    { to: '/compliance', icon: FileText, label: 'Compliance', feature: 'compliance', roles: ['Admin', 'Manager', 'Operator'] },
+    { to: '/utilization', icon: Activity, label: 'Utilization', feature: 'utilization', roles: ['Admin', 'Manager'] },
+    { to: '/reports', icon: FileText, label: 'Reports', feature: 'reports', roles: ['Admin', 'Manager'] },
+    { to: '/field-service-reports', icon: FileText, label: 'Field Service Reports', roles: ['Admin', 'Manager', 'Technician'] },
+    { to: '/users', icon: Users, label: 'User Management', feature: 'user_management', roles: ['Admin'] },
+    { to: '/technicians', icon: Wrench, label: 'Technicians', feature: 'technicians', roles: ['Admin', 'Manager', 'Technician'] },
+    { to: '/settings', icon: Settings, label: 'Settings', roles: ['Admin', 'Manager'] },
   ];
+
+  const filteredNavItems = navItems.filter(item => {
+    // Check feature flag
+    if (item.feature && settings?.features) {
+      if (!settings.features[item.feature as keyof typeof settings.features]) return false;
+    }
+    
+    // Check role access
+    if (item.roles && profile?.role) {
+      if (!item.roles.includes(profile.role)) return false;
+    }
+    
+    return true;
+  });
 
   const NavContent = () => (
     <>
       <div className="p-6 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-orange-600 flex items-center space-x-2">
-          <Truck className="w-6 h-6" />
-          <span>Fanned Fleet</span>
-        </h1>
+        <div className="flex items-center space-x-3">
+          {settings?.logo_url ? (
+            <img src={settings.logo_url} alt="Company Logo" className="h-12 w-auto max-w-[120px] object-contain" />
+          ) : (
+            <Truck className="w-8 h-8 text-orange-600" />
+          )}
+          <h1 className="text-xl font-bold text-orange-600">
+            <span>{settings?.company_name || 'MineFleet'}</span>
+          </h1>
+        </div>
       </div>
       <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.to;
           return (
             <Link

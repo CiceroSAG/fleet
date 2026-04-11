@@ -4,6 +4,7 @@ import { getEquipment, deleteEquipment } from '../lib/api';
 import { Plus, Search, Filter, MoreVertical, Truck, Info, Wrench, Fuel, Edit2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import EquipmentForm from '../components/EquipmentForm';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function EquipmentList() {
   const queryClient = useQueryClient();
@@ -12,6 +13,7 @@ export default function EquipmentList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: equipment, isLoading } = useQuery({
     queryKey: ['equipment'],
@@ -40,8 +42,13 @@ export default function EquipmentList() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this equipment? This action cannot be undone.')) {
-      deleteMutation.mutate(id);
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -206,6 +213,14 @@ export default function EquipmentList() {
           }}
         />
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Equipment"
+        message="Are you sure you want to delete this equipment? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

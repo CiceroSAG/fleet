@@ -26,6 +26,9 @@ import ComplianceManagement from './pages/ComplianceManagement';
 import AssetUtilization from './pages/AssetUtilization';
 import Reports from './pages/Reports';
 import PartsInventory from './pages/PartsInventory';
+import UserManagement from './pages/UserManagement';
+import Technicians from './pages/Technicians';
+import FieldServiceReports from './pages/FieldServiceReports';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +82,9 @@ export default function App() {
               <Route path="compliance" element={<ComplianceManagement />} />
               <Route path="utilization" element={<AssetUtilization />} />
               <Route path="reports" element={<Reports />} />
+              <Route path="users" element={<UserManagement />} />
+              <Route path="technicians" element={<Technicians />} />
+              <Route path="field-service-reports" element={<FieldServiceReports />} />
             </Route>
           </Routes>
         </BrowserRouter>

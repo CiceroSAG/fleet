@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPartsInventory, deletePart } from '../lib/api';
 import { Plus, Search, Box, AlertCircle, MoreVertical, Package, ShoppingCart, Edit2, Trash2 } from 'lucide-react';
 import PartForm from '../components/PartForm';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function PartsInventory() {
   const queryClient = useQueryClient();
@@ -10,6 +11,7 @@ export default function PartsInventory() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: parts, isLoading } = useQuery({
     queryKey: ['partsInventory'],
@@ -36,8 +38,13 @@ export default function PartsInventory() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this part from inventory?')) {
-      deleteMutation.mutate(id);
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -197,6 +204,14 @@ export default function PartsInventory() {
           }}
         />
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Part"
+        message="Are you sure you want to delete this part from inventory?"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

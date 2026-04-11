@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getFuelLogs, deleteFuelLog, getSettings } from '@/lib/api';
 import { Plus, Search, Edit2, Trash2, Filter, Fuel, DollarSign, TrendingUp, Calendar } from 'lucide-react';
 import FuelLogForm from '@/components/FuelLogForm';
+import ConfirmModal from '@/components/ConfirmModal';
 import { useAuth } from '@/lib/auth';
 import { getCurrencySymbol } from '@/lib/utils';
 
@@ -12,6 +13,7 @@ export default function FuelLogs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [equipmentFilter, setEquipmentFilter] = useState('all');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -38,8 +40,13 @@ export default function FuelLogs() {
   });
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this log?')) {
-      deleteMutation.mutate(id);
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -68,8 +75,8 @@ export default function FuelLogs() {
     if (!filteredLogs) return { total: 0, totalQuantity: 0, totalCost: 0, avgPrice: 0 };
     
     const total = filteredLogs.length;
-    const totalQuantity = filteredLogs.reduce((sum, log) => sum + Number(log.quantity), 0);
-    const totalCost = filteredLogs.reduce((sum, log) => sum + Number(log.cost), 0);
+    const totalQuantity = filteredLogs.reduce((sum, log) => sum + Number(log.quantity || 0), 0);
+    const totalCost = filteredLogs.reduce((sum, log) => sum + Number(log.cost || 0), 0);
     const avgPrice = totalQuantity > 0 ? totalCost / totalQuantity : 0;
     
     return { total, totalQuantity, totalCost, avgPrice };
@@ -258,6 +265,14 @@ export default function FuelLogs() {
       {isFormOpen && (
         <FuelLogForm log={editingLog} onClose={closeForm} />
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Fuel Log"
+        message="Are you sure you want to delete this log?"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }
