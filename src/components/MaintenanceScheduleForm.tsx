@@ -25,6 +25,8 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
     status: 'active',
     assigned_to: '',
     estimated_cost: '',
+    parts_replaced: '',
+    parts_ordered: '',
     notes: '',
   });
 
@@ -41,6 +43,8 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
         status: schedule.status || 'active',
         assigned_to: schedule.assigned_to || '',
         estimated_cost: schedule.estimated_cost?.toString() || '',
+        parts_replaced: schedule.parts_replaced || '',
+        parts_ordered: schedule.parts_ordered || '',
         notes: schedule.notes || '',
       });
     }
@@ -96,9 +100,9 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-xl font-bold text-gray-900">
             {schedule ? 'Edit Maintenance Schedule' : 'Add Maintenance Schedule'}
           </h2>
@@ -110,7 +114,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
               <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
@@ -285,6 +289,35 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
                 step="0.01"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
               />
+            </div>
+            
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Parts Replaced (Planned)
+                </label>
+                <textarea
+                  name="parts_replaced"
+                  value={formData.parts_replaced || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none resize-none"
+                  placeholder="Parts usually replaced during this service..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Parts Ordered (Planned)
+                </label>
+                <textarea
+                  name="parts_ordered"
+                  value={formData.parts_ordered || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none resize-none"
+                  placeholder="Parts to be ordered before service..."
+                />
+              </div>
             </div>
             
             <div className="md:col-span-2">

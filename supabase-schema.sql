@@ -106,10 +106,13 @@ CREATE TABLE maintenance_logs (
   workplace TEXT,
   index_value NUMERIC,
   next_service_date DATE,
+  parts_replaced TEXT,
+  parts_ordered TEXT,
   status TEXT DEFAULT 'scheduled', -- scheduled, in_progress, completed
   approval_status TEXT DEFAULT 'pending', -- pending, approved, rejected
   approved_by UUID REFERENCES profiles(id),
   approved_at TIMESTAMP WITH TIME ZONE,
+  date_completed TIMESTAMP WITH TIME ZONE,
   schedule_id UUID REFERENCES maintenance_schedules(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -117,11 +120,15 @@ CREATE TABLE maintenance_logs (
 CREATE TABLE repair_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   equipment_id UUID REFERENCES equipment(id) NOT NULL,
+  repair_type TEXT,
   issue_description TEXT NOT NULL,
   action_taken TEXT,
+  parts_replaced TEXT,
+  parts_ordered TEXT,
   workplace TEXT,
   index_value NUMERIC,
   date_reported TIMESTAMP WITH TIME ZONE NOT NULL,
+  date_completed TIMESTAMP WITH TIME ZONE,
   status TEXT NOT NULL DEFAULT 'Pending', -- Pending, In Progress, Completed
   cost NUMERIC,
   schedule_id UUID REFERENCES maintenance_schedules(id),
@@ -272,6 +279,8 @@ CREATE TABLE maintenance_schedules (
   status TEXT NOT NULL DEFAULT 'active', -- active, completed, overdue, cancelled
   assigned_to UUID REFERENCES profiles(id),
   estimated_cost DECIMAL(8, 2),
+  parts_replaced TEXT,
+  parts_ordered TEXT,
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -568,6 +577,11 @@ CREATE TABLE field_service_reports (
   technician_id UUID REFERENCES profiles(id),
   schedule_id UUID REFERENCES maintenance_schedules(id),
   status TEXT DEFAULT 'pending', -- pending, in_progress, completed
+  parts_replaced TEXT,
+  parts_ordered TEXT,
+  maintenance_details JSONB DEFAULT '{}',
+  repair_details JSONB DEFAULT '{}',
+  safety_details JSONB DEFAULT '{}',
   report_date DATE DEFAULT CURRENT_DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

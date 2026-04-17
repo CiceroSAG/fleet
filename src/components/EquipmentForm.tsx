@@ -105,7 +105,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl overflow-hidden">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl overflow-hidden max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-900">
             {item ? 'Edit Equipment' : 'Add New Equipment'}
@@ -115,7 +115,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[85vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {error}
@@ -130,7 +130,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="asset_tag"
-                value={formData.asset_tag}
+                value={formData.asset_tag || ''}
                 onChange={handleChange}
                 required
                 placeholder="e.g. TRK-001"
@@ -142,7 +142,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="type"
-                value={formData.type}
+                value={formData.type || ''}
                 onChange={handleChange}
                 required
                 placeholder="e.g. Dump Truck"
@@ -153,7 +153,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <select
                 name="category_id"
-                value={formData.category_id}
+                value={formData.category_id || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               >
@@ -168,7 +168,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="manufacturer"
-                value={formData.manufacturer}
+                value={formData.manufacturer || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -178,7 +178,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="model"
-                value={formData.model}
+                value={formData.model || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -202,7 +202,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="serial_number"
-                value={formData.serial_number}
+                value={formData.serial_number || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -212,7 +212,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="license_plate"
-                value={formData.license_plate}
+                value={formData.license_plate || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -222,7 +222,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="vin"
-                value={formData.vin}
+                value={formData.vin || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -231,7 +231,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
                 name="status"
-                value={formData.status}
+                value={formData.status || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               >
@@ -245,7 +245,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Operator</label>
               <select
                 name="assigned_operator_id"
-                value={formData.assigned_operator_id}
+                value={formData.assigned_operator_id || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               >
@@ -286,7 +286,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="date"
                 name="purchase_date"
-                value={formData.purchase_date}
+                value={formData.purchase_date || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -306,7 +306,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="text"
                 name="warranty_provider"
-                value={formData.warranty_provider}
+                value={formData.warranty_provider || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -316,7 +316,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="date"
                 name="warranty_start_date"
-                value={formData.warranty_start_date}
+                value={formData.warranty_start_date || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />
@@ -326,7 +326,7 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
               <input
                 type="date"
                 name="warranty_end_date"
-                value={formData.warranty_end_date}
+                value={formData.warranty_end_date || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               />

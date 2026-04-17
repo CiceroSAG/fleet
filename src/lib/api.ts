@@ -539,6 +539,9 @@ export async function createMaintenanceLog(log: any, technicianIds: string[] = [
 export async function updateMaintenanceLog(id: string, log: any, technicianIds: string[] = []) {
   // Sanitize empty strings to null
   const sanitizedLog = { ...log };
+  if (sanitizedLog.status === 'completed' && !sanitizedLog.date_completed) {
+    sanitizedLog.date_completed = new Date().toISOString();
+  }
   Object.keys(sanitizedLog).forEach(key => {
     if (sanitizedLog[key] === '') sanitizedLog[key] = null;
   });
@@ -780,6 +783,9 @@ export async function updateRepairLog(id: string, log: any) {
 
   // Sanitize empty strings to null
   const sanitizedLog = { ...log };
+  if ((sanitizedLog.status === 'Completed' || sanitizedLog.status === 'completed') && !sanitizedLog.date_completed) {
+    sanitizedLog.date_completed = new Date().toISOString();
+  }
   Object.keys(sanitizedLog).forEach(key => {
     if (sanitizedLog[key] === '') sanitizedLog[key] = null;
   });
@@ -3357,9 +3363,13 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
       .insert(assetsToInsert);
     if (assetsError) throw assetsError;
 
-    // Create maintenance/repair logs for each asset
+    // Create maintenance/repair logs and incidents for each asset
     for (const asset of sanitizedAssets) {
-      if (sanitizedReport.job_type === 'PM') {
+      // 1. Handle Maintenance (Automatic creation if any maintenance check is selected)
+      const hasMaintenance = sanitizedReport.maintenance_details && 
+        Object.values(sanitizedReport.maintenance_details).some(v => v === true);
+      
+      if (sanitizedReport.job_type === 'PM' || hasMaintenance) {
         await createMaintenanceLog({
           equipment_id: asset.equipment_id,
           service_type: 'routine',
@@ -3369,14 +3379,24 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
           workplace: sanitizedReport.workplace,
           index_value: asset.index_value,
           next_service_date: asset.next_service_date,
+          parts_replaced: sanitizedReport.parts_replaced,
+          parts_ordered: sanitizedReport.parts_ordered,
           status: sanitizedReport.status === 'completed' ? 'completed' : 
                   sanitizedReport.status === 'in_progress' ? 'in_progress' : 'scheduled'
         }, [], scheduleId);
-      } else if (sanitizedReport.job_type === 'RP' || sanitizedReport.job_type === 'BD') {
+      } 
+      
+      // 2. Handle Repair (Automatic creation if any repair type is selected)
+      const hasRepair = sanitizedReport.repair_details && 
+        Object.values(sanitizedReport.repair_details).some(v => v === true);
+
+      if (sanitizedReport.job_type === 'RP' || sanitizedReport.job_type === 'BD' || hasRepair) {
         await createRepairLog({
           equipment_id: asset.equipment_id,
           issue_description: sanitizedReport.job_description,
           action_taken: sanitizedReport.action_taken,
+          parts_replaced: sanitizedReport.parts_replaced,
+          parts_ordered: sanitizedReport.parts_ordered,
           workplace: sanitizedReport.workplace,
           index_value: asset.index_value,
           date_reported: new Date(sanitizedReport.report_date).toISOString(),
@@ -3384,6 +3404,30 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
                   sanitizedReport.status === 'in_progress' ? 'in_progress' : 'pending',
           cost: 0
         }, scheduleId);
+      }
+
+      // 3. Handle Incident (Automatic creation if any safety type is selected)
+      const hasIncident = sanitizedReport.safety_details && 
+        sanitizedReport.safety_details.incident_type && 
+        sanitizedReport.safety_details.incident_type !== 'none';
+        
+      if (sanitizedReport.job_type === 'SAF' || hasIncident) {
+        await createIncident({
+          equipment_id: asset.equipment_id,
+          type_of_damage: sanitizedReport.safety_details?.incident_type || 'General Safety Issue',
+          severity: sanitizedReport.safety_details?.severity || 'Low',
+          date: new Date(sanitizedReport.report_date).toISOString(),
+          reported_by: sanitizedReport.technician_name,
+          notes: sanitizedReport.job_description
+        });
+      }
+      
+      // Update equipment odometer/hours
+      if (asset.index_value > 0) {
+        await supabase
+          .from('equipment')
+          .update({ odometer: asset.index_value })
+          .eq('id', asset.equipment_id);
       }
     }
   }
@@ -3466,11 +3510,21 @@ export async function updateFieldServiceReport(id: string, report: any, assets: 
                      (sanitizedReport.job_type === 'PM' ? 'scheduled' : 'pending');
 
     await Promise.all([
-      supabase.from('maintenance_logs').update({ status: logStatus }).eq('schedule_id', reportData.schedule_id),
-      supabase.from('repair_logs').update({ status: logStatus }).eq('schedule_id', reportData.schedule_id),
+      supabase.from('maintenance_logs').update({ 
+        status: logStatus,
+        parts_replaced: sanitizedReport.parts_replaced,
+        parts_ordered: sanitizedReport.parts_ordered
+      }).eq('schedule_id', reportData.schedule_id),
+      supabase.from('repair_logs').update({ 
+        status: logStatus,
+        parts_replaced: sanitizedReport.parts_replaced,
+        parts_ordered: sanitizedReport.parts_ordered
+      }).eq('schedule_id', reportData.schedule_id),
       supabase.from('maintenance_schedules').update({ 
         status: sanitizedReport.status === 'completed' ? 'completed' : 
-                sanitizedReport.status === 'in_progress' ? 'in_progress' : 'active' 
+                sanitizedReport.status === 'in_progress' ? 'in_progress' : 'active',
+        parts_replaced: sanitizedReport.parts_replaced,
+        parts_ordered: sanitizedReport.parts_ordered
       }).eq('id', reportData.schedule_id)
     ]);
   }

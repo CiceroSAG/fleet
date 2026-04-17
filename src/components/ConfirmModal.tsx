@@ -24,8 +24,8 @@ export default function ConfirmModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="p-6">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="p-6 overflow-y-auto flex-1">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
             <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>

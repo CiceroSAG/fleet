@@ -7,10 +7,11 @@ import { useAuth } from '../lib/auth';
 interface MaintenanceFormProps {
   log?: any;
   schedule?: any;
+  initialData?: any;
   onClose: () => void;
 }
 
-export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceFormProps) {
+export default function MaintenanceForm({ log, schedule, initialData, onClose }: MaintenanceFormProps) {
   const queryClient = useQueryClient();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
@@ -20,7 +21,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
   const [selectedTechnicians, setSelectedTechnicians] = useState<string[]>([]);
   const [isTechDropdownOpen, setIsTechDropdownOpen] = useState(false);
   const [formData, setFormData] = useState({
-    equipment_id: '',
+    equipment_id: initialData?.equipment_id || '',
     service_type: 'routine',
     date: new Date().toISOString().split('T')[0],
     cost: '',
@@ -28,6 +29,8 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
     next_service_date: '',
     workplace: '',
     description: '',
+    parts_replaced: '',
+    parts_ordered: '',
     status: 'completed',
   });
 
@@ -52,6 +55,8 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
         next_service_date: log.next_service_date || '',
         workplace: log.workplace || '',
         description: log.notes || log.description || '',
+        parts_replaced: log.parts_replaced || '',
+        parts_ordered: log.parts_ordered || '',
         status: log.status || 'completed',
       });
       
@@ -68,6 +73,8 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
         next_service_date: '',
         workplace: '',
         description: schedule.description || '',
+        parts_replaced: schedule.parts_replaced || '',
+        parts_ordered: schedule.parts_ordered || '',
         status: 'completed',
       });
       
@@ -140,7 +147,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2 text-red-600 text-sm">
               <AlertCircle className="w-4 h-4" />
@@ -152,7 +159,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
               <label className="block text-sm font-medium text-gray-700 mb-1">Equipment</label>
               <select
                 name="equipment_id"
-                value={formData.equipment_id}
+                value={formData.equipment_id || ''}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -169,7 +176,7 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
                 <select
                   name="service_type"
-                  value={formData.service_type}
+                  value={formData.service_type || ''}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 >
@@ -304,20 +311,45 @@ export default function MaintenanceForm({ log, schedule, onClose }: MaintenanceF
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 name="description"
-                value={formData.description}
+                value={formData.description || ''}
                 onChange={handleChange}
-                rows={3}
+                rows={2}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
                 placeholder="Describe the work performed..."
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Parts Replaced</label>
+                <textarea
+                  name="parts_replaced"
+                  value={formData.parts_replaced || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                  placeholder="List parts replaced..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Parts Ordered</label>
+                <textarea
+                  name="parts_ordered"
+                  value={formData.parts_ordered || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                  placeholder="List parts ordered..."
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
                 name="status"
-                value={formData.status}
+                value={formData.status || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
               >

@@ -19,10 +19,11 @@ type FuelLogFormData = z.infer<typeof fuelLogSchema>;
 
 interface FuelLogFormProps {
   log?: any;
+  initialData?: any;
   onClose: () => void;
 }
 
-export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
+export default function FuelLogForm({ log, initialData, onClose }: FuelLogFormProps) {
   const queryClient = useQueryClient();
   const { data: equipment } = useQuery({ 
     queryKey: ['equipment'], 
@@ -34,7 +35,7 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
   const { register, handleSubmit, formState: { errors } } = useForm<FuelLogFormData>({
     resolver: zodResolver(fuelLogSchema) as any,
     defaultValues: {
-      equipment_id: log?.equipment_id || '',
+      equipment_id: log?.equipment_id || initialData?.equipment_id || '',
       date: log?.date ? new Date(log.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
       quantity: log?.quantity || 0,
       cost: log?.cost || 0,
@@ -86,8 +87,8 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-black/50 p-4">
-      <div className="relative w-full max-w-md rounded-lg bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="relative w-full max-w-md rounded-lg bg-white shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b p-4">
           <h3 className="text-xl font-semibold text-gray-900">
             {log ? 'Edit Fuel Log' : 'Add Fuel Log'}
@@ -100,7 +101,7 @@ export default function FuelLogForm({ log, onClose }: FuelLogFormProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 overflow-y-auto flex-1">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-md">
               {error}

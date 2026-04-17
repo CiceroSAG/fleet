@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getEquipment, getOperators, getMaintenanceLogs, getFuelLogs, getAssignedMaintenanceSchedules, getFieldServiceReports } from '../lib/api';
+import { getEquipment, getOperators, getMaintenanceLogs, getFuelLogs, getAssignedMaintenanceSchedules, getFieldServiceReports, getRepairLogs, getMaintenanceSchedules } from '../lib/api';
 import { Truck, Users, ClipboardList, Fuel, TrendingUp, BarChart3, PieChart, FileText, ChevronRight, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import FieldServiceReportForm from '../components/FieldServiceReportForm';
@@ -19,6 +19,8 @@ export default function Dashboard() {
   const { data: maintenance } = useQuery({ queryKey: ['maintenanceLogs'], queryFn: getMaintenanceLogs });
   const { data: fuelLogs } = useQuery({ queryKey: ['fuelLogs'], queryFn: getFuelLogs });
   const { data: fsr } = useQuery({ queryKey: ['fieldServiceReports'], queryFn: getFieldServiceReports });
+  const { data: repairLogs } = useQuery({ queryKey: ['repairLogs'], queryFn: getRepairLogs });
+  const { data: schedules } = useQuery({ queryKey: ['maintenanceSchedules'], queryFn: getMaintenanceSchedules });
   const { data: assignedTasks } = useQuery({ 
     queryKey: ['assignedTasks', session?.user?.id], 
     queryFn: () => getAssignedMaintenanceSchedules(session?.user?.id || ''),
@@ -29,6 +31,26 @@ export default function Dashboard() {
     return maintenance?.filter((log: any) => log.approval_status === 'pending') || [];
   }, [maintenance]);
 
+  const mttr = useMemo(() => {
+    if (!repairLogs) return 0;
+    const completed = (repairLogs as any[]).filter((log: any) => 
+      (log.status === 'Completed' || log.status === 'completed') && log.date_reported && log.date_completed
+    );
+    if (completed.length === 0) return 0;
+    const totalHours = completed.reduce((sum: number, log: any) => {
+      const start = new Date(log.date_reported).getTime();
+      const end = new Date(log.date_completed).getTime();
+      return sum + (end - start) / (1000 * 60 * 60);
+    }, 0);
+    return Math.round(totalHours / completed.length);
+  }, [repairLogs]);
+
+  const compliance = useMemo(() => {
+    if (!schedules || (schedules as any[]).length === 0) return 0;
+    const completed = (schedules as any[]).filter((s: any) => s.status === 'completed').length;
+    return Math.round((completed / (schedules as any[]).length) * 100);
+  }, [schedules]);
+
   const stats = [
     { 
       label: 'Total Equipment', 
@@ -38,18 +60,18 @@ export default function Dashboard() {
       bgColor: 'bg-orange-50' 
     },
     { 
-      label: 'Active Operators', 
-      value: operators?.length || 0, 
-      icon: Users, 
-      color: 'text-blue-600', 
-      bgColor: 'bg-blue-50' 
-    },
-    { 
-      label: 'Maintenance Logs', 
-      value: maintenance?.length || 0, 
-      icon: ClipboardList, 
+      label: 'Compliance Rate', 
+      value: `${compliance}%`, 
+      icon: CheckCircle2, 
       color: 'text-green-600', 
       bgColor: 'bg-green-50' 
+    },
+    { 
+      label: 'Mean Time To Repair', 
+      value: `${mttr} hrs`, 
+      icon: Clock, 
+      color: 'text-blue-600', 
+      bgColor: 'bg-blue-50' 
     },
     { 
       label: 'Service Reports', 

@@ -4,6 +4,8 @@ import { getEquipment, deleteEquipment } from '../lib/api';
 import { Plus, Search, Filter, MoreVertical, Truck, Info, Wrench, Fuel, Edit2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import EquipmentForm from '../components/EquipmentForm';
+import FuelLogForm from '../components/FuelLogForm';
+import MaintenanceForm from '../components/MaintenanceForm';
 import ConfirmModal from '../components/ConfirmModal';
 
 export default function EquipmentList() {
@@ -11,6 +13,8 @@ export default function EquipmentList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFuelFormOpen, setIsFuelFormOpen] = useState(false);
+  const [isMaintenanceFormOpen, setIsMaintenanceFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -143,6 +147,20 @@ export default function EquipmentList() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2 relative">
+                      <button
+                        onClick={() => { setSelectedItem(item); setIsFuelFormOpen(true); }}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Log Fuel"
+                      >
+                        <Fuel className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => { setSelectedItem(item); setIsMaintenanceFormOpen(true); }}
+                        className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                        title="Log Maintenance"
+                      >
+                        <Wrench className="w-4 h-4" />
+                      </button>
                       <Link
                         to={`/equipment/${item.id}`}
                         className="p-1 text-gray-400 hover:text-orange-600 transition-colors"
@@ -211,6 +229,26 @@ export default function EquipmentList() {
             setIsFormOpen(false);
             setSelectedItem(null);
           }}
+        />
+      )}
+
+      {isFuelFormOpen && (
+        <FuelLogForm
+          onClose={() => {
+            setIsFuelFormOpen(false);
+            setSelectedItem(null);
+          }}
+          initialData={{ equipment_id: selectedItem?.id }}
+        />
+      )}
+
+      {isMaintenanceFormOpen && (
+        <MaintenanceForm
+          onClose={() => {
+            setIsMaintenanceFormOpen(false);
+            setSelectedItem(null);
+          }}
+          initialData={{ equipment_id: selectedItem?.id }}
         />
       )}
       <ConfirmModal

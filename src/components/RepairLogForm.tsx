@@ -21,6 +21,8 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
     status: 'completed', // Default to completed if coming from schedule
     issue_description: schedule?.notes || '',
     action_taken: '',
+    parts_replaced: '',
+    parts_ordered: '',
     workplace: '',
     index_value: '',
   });
@@ -35,6 +37,8 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
         status: log.status || 'in_progress',
         issue_description: log.issue_description || '',
         action_taken: log.action_taken || '',
+        parts_replaced: log.parts_replaced || '',
+        parts_ordered: log.parts_ordered || '',
         workplace: log.workplace || '',
         index_value: log.index_value?.toString() || '',
       });
@@ -46,6 +50,8 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
         issue_description: schedule.notes || '',
         status: 'completed',
         action_taken: '',
+        parts_replaced: '',
+        parts_ordered: '',
         workplace: '',
         index_value: '',
       }));
@@ -84,7 +90,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-900">
             {log ? 'Edit Repair Log' : 'New Repair Log'}
@@ -94,7 +100,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2 text-red-600 text-sm">
               <AlertCircle className="w-4 h-4" />
@@ -106,7 +112,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
               <label className="block text-sm font-medium text-gray-700 mb-1">Equipment</label>
               <select
                 name="equipment_id"
-                value={formData.equipment_id}
+                value={formData.equipment_id || ''}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
@@ -125,23 +131,40 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 <label className="block text-sm font-medium text-gray-700 mb-1">Repair Type</label>
                 <select
                   name="repair_type"
-                  value={formData.repair_type}
+                  value={formData.repair_type || ''}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 >
-                  <option value="mechanical">Mechanical</option>
-                  <option value="electrical">Electrical</option>
-                  <option value="hydraulic">Hydraulic</option>
-                  <option value="body">Body Work</option>
-                  <option value="tires">Tires</option>
-                  <option value="other">Other</option>
+                  <optgroup label="General">
+                    <option value="mechanical">Mechanical</option>
+                    <option value="electrical">Electrical</option>
+                    <option value="hydraulic">Hydraulic</option>
+                    <option value="body">Body Work</option>
+                    <option value="tires">Tires</option>
+                    <option value="other">Other</option>
+                  </optgroup>
+                  <optgroup label="Common Manitou Faults">
+                    <option value="boom_not_lifting">Boom not lifting up and no boom extension</option>
+                    <option value="service_brake_failure">Service brake failure</option>
+                    <option value="engine_overheating">Engine overheating</option>
+                    <option value="hydraulic_leaks">Hydraulic leaks</option>
+                    <option value="hydraulic_overheating">Hydraulic overheating</option>
+                    <option value="engine_not_starting">Engine not starting</option>
+                    <option value="engine_failure">Engine failure</option>
+                    <option value="electrical_problems">Electrical problems</option>
+                    <option value="transmission_failure">Transmission failure or problem</option>
+                    <option value="differential_problem">Differential problem</option>
+                    <option value="final_drive_failure">Final drive failure</option>
+                    <option value="hydro_static_motor_failure">Hydro static motor failure</option>
+                    <option value="boom_sensor_failure">Reel or boom sensor failure</option>
+                  </optgroup>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   name="status"
-                  value={formData.status}
+                  value={formData.status || ''}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 >
@@ -224,6 +247,31 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
                 placeholder="Describe the work performed..."
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Parts Replaced</label>
+                <textarea
+                  name="parts_replaced"
+                  value={formData.parts_replaced || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                  placeholder="List parts replaced..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Parts Ordered</label>
+                <textarea
+                  name="parts_ordered"
+                  value={formData.parts_ordered || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                  placeholder="List parts ordered..."
+                />
+              </div>
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEquipment, getTechnicians, createFieldServiceReport, updateFieldServiceReport, getTechnicianByUserId } from '../lib/api';
-import { Plus, Trash2, Save, X, Building2, Wrench, Package, UserCheck } from 'lucide-react';
+import { Plus, Trash2, Save, X, Building2, Wrench, Package, UserCheck, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth';
 
@@ -24,6 +24,11 @@ interface FieldServiceReportFormProps {
     technician_id?: string;
     report_date?: string;
     status?: string;
+    parts_replaced?: string;
+    parts_ordered?: string;
+    maintenance_details?: any;
+    repair_details?: any;
+    safety_details?: any;
     assets?: { equipment_id: string; index_value: number; next_service_date: string }[];
     parts?: { part_description: string; quantity_used: number; remark: string }[];
   };
@@ -56,6 +61,25 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
     technician_id: initialData?.technician_id || profile?.id || '',
     report_date: initialData?.report_date || new Date().toISOString().split('T')[0],
     status: initialData?.status || 'pending',
+    parts_replaced: initialData?.parts_replaced || '',
+    parts_ordered: initialData?.parts_ordered || '',
+    maintenance_details: initialData?.maintenance_details || {
+      inspection: false,
+      oil_change: false,
+      greasing: false,
+      other: false,
+    },
+    repair_details: initialData?.repair_details || {
+      mechanical: false,
+      electrical: false,
+      hydraulic: false,
+      body_work: false,
+      tires: false,
+    },
+    safety_details: initialData?.safety_details || {
+      incident_type: 'none',
+      severity: 'Minor',
+    },
   });
 
   // Update technician name when record is loaded
@@ -162,7 +186,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                 <input
                   type="text"
                   required
-                  value={report.workplace}
+                  value={report.workplace || ''}
                   onChange={e => setReport({ ...report, workplace: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none transition-all"
                   placeholder="e.g. Kamoa Mine Site"
@@ -171,7 +195,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Job Type</label>
                 <select
-                  value={report.job_type}
+                  value={report.job_type || ''}
                   onChange={e => setReport({ ...report, job_type: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none transition-all"
                 >
@@ -184,7 +208,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
                 <select
-                  value={report.status}
+                  value={report.status || ''}
                   onChange={e => setReport({ ...report, status: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none transition-all"
                 >
@@ -205,6 +229,106 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               </div>
             </div>
           </section>
+
+          {/* New Sections: Multi-Module Checklists */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Maintenance Section */}
+            <section className="space-y-4 bg-blue-50/30 p-4 rounded-xl border border-blue-100">
+              <div className="flex items-center space-x-2 text-blue-600 border-b border-blue-100 pb-2">
+                <CheckCircle2 className="w-5 h-5" />
+                <h3 className="font-semibold uppercase tracking-wider text-[10px]">Maintenance Checklist</h3>
+              </div>
+              <div className="space-y-2">
+                {['inspection', 'oil_change', 'greasing', 'other'].map((type) => (
+                  <label key={type} className="flex items-center space-x-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={report.maintenance_details?.[type] || false}
+                      onChange={(e) => setReport({
+                        ...report,
+                        maintenance_details: { ...report.maintenance_details, [type]: e.target.checked }
+                      })}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-xs text-gray-700 capitalize group-hover:text-blue-600 transition-colors">
+                      {type.replace('_', ' ')}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            {/* Repair Section */}
+            <section className="space-y-4 bg-orange-50/30 p-4 rounded-xl border border-orange-100">
+              <div className="flex items-center space-x-2 text-orange-600 border-b border-orange-100 pb-2">
+                <Wrench className="w-5 h-5" />
+                <h3 className="font-semibold uppercase tracking-wider text-[10px]">Repair types</h3>
+              </div>
+              <div className="space-y-2">
+                {['mechanical', 'electrical', 'hydraulic', 'body_work', 'tires'].map((type) => (
+                  <label key={type} className="flex items-center space-x-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={report.repair_details?.[type] || false}
+                      onChange={(e) => setReport({
+                        ...report,
+                        repair_details: { ...report.repair_details, [type]: e.target.checked }
+                      })}
+                      className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-xs text-gray-700 capitalize group-hover:text-orange-600 transition-colors">
+                      {type.replace('_', ' ')}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            {/* Safety/Incident Section */}
+            <section className="space-y-4 bg-red-50/30 p-4 rounded-xl border border-red-100">
+              <div className="flex items-center space-x-2 text-red-600 border-b border-red-100 pb-2">
+                <ShieldCheck className="w-5 h-5" />
+                <h3 className="font-semibold uppercase tracking-wider text-[10px]">Safety / Incident</h3>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Incident Type</label>
+                  <select
+                    value={report.safety_details?.incident_type || 'none'}
+                    onChange={(e) => setReport({
+                      ...report,
+                      safety_details: { ...report.safety_details, incident_type: e.target.value }
+                    })}
+                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md outline-none focus:ring-1 focus:ring-red-500"
+                  >
+                    <option value="none">None</option>
+                    <option value="collision">Collision</option>
+                    <option value="breakdown">Breakdown</option>
+                    <option value="theft">Theft</option>
+                    <option value="personal_injury">Personal Injury</option>
+                    <option value="environmental_spill">Environmental Spill</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Severity</label>
+                  <select
+                    value={report.safety_details?.severity || 'Minor'}
+                    onChange={(e) => setReport({
+                      ...report,
+                      safety_details: { ...report.safety_details, severity: e.target.value }
+                    })}
+                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md outline-none focus:ring-1 focus:ring-red-500"
+                  >
+                    <option value="Minor">Minor</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Major">Major</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+          </div>
 
           {/* Section 2: Assets */}
           <section className="space-y-6">
@@ -238,7 +362,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Asset ID</label>
                         <select
                           required
-                          value={asset.equipment_id}
+                          value={asset.equipment_id || ''}
                           onChange={e => handleAssetChange(index, 'equipment_id', e.target.value)}
                           className="w-full px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                         >
@@ -273,7 +397,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                       <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Next Service Due</label>
                       <input
                         type="date"
-                        value={asset.next_service_date}
+                        value={asset.next_service_date || ''}
                         onChange={e => handleAssetChange(index, 'next_service_date', e.target.value)}
                         className="w-full px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                       />
@@ -303,7 +427,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               </div>
               <textarea
                 required
-                value={report.job_description}
+                value={report.job_description || ''}
                 onChange={e => setReport({ ...report, job_description: e.target.value })}
                 rows={6}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all resize-none"
@@ -316,11 +440,39 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               </div>
               <textarea
                 required
-                value={report.action_taken}
+                value={report.action_taken || ''}
                 onChange={e => setReport({ ...report, action_taken: e.target.value })}
                 rows={6}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all resize-none"
                 placeholder="Detail the actions performed..."
+              />
+            </div>
+          </section>
+
+          {/* Section 3.5: Parts Summary */}
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-orange-600 border-b border-orange-100 pb-2">
+                <h3 className="font-semibold uppercase tracking-wider text-sm">Parts Replaced (Summary)</h3>
+              </div>
+              <textarea
+                value={report.parts_replaced || ''}
+                onChange={e => setReport({ ...report, parts_replaced: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all resize-none"
+                placeholder="Summary of parts replaced..."
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-orange-600 border-b border-orange-100 pb-2">
+                <h3 className="font-semibold uppercase tracking-wider text-sm">Parts Ordered (Summary)</h3>
+              </div>
+              <textarea
+                value={report.parts_ordered || ''}
+                onChange={e => setReport({ ...report, parts_ordered: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all resize-none"
+                placeholder="Summary of parts ordered..."
               />
             </div>
           </section>
@@ -348,7 +500,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                     <input
                       type="text"
                       placeholder="Part Description"
-                      value={part.part_description}
+                      value={part.part_description || ''}
                       onChange={e => handlePartChange(index, 'part_description', e.target.value)}
                       className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
                     />
