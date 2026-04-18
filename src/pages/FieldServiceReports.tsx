@@ -201,33 +201,38 @@ export default function FieldServiceReports() {
     
     // Job Description & Actions Section
     currentY = (doc as any).lastAutoTable.finalY + 15;
-    
-    // Two column layout for description and actions if they fit, otherwise stack
-    const descHeight = doc.getTextDimensions(report.job_description || '', { maxWidth: 90 }).h;
-    const actionHeight = doc.getTextDimensions(report.action_taken || '', { maxWidth: 90 }).h;
+    if (currentY > 230) { doc.addPage(); currentY = 20; }
     
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('3. WORK DETAILS', 10, currentY);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('3. WORK DETAILS & ACTIONS', 10, currentY);
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.line(10, currentY + 2, 200, currentY + 2);
     
     doc.setFontSize(10);
-    doc.text('Job Description:', 10, currentY + 10);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text('JOB DESCRIPTION / SCOPE OF WORK:', 10, currentY + 10);
     doc.setFont('helvetica', 'normal');
-    doc.text(report.job_description || 'No description provided.', 15, currentY + 16, { maxWidth: 85 });
+    const descLines = doc.splitTextToSize(report.job_description || 'No description provided.', 85);
+    doc.text(descLines, 15, currentY + 16);
     
     doc.setFont('helvetica', 'bold');
-    doc.text('Actions Taken:', 105, currentY + 10);
+    doc.text('ACTIONS TAKEN / REPAIRS PERFORMED:', 105, currentY + 10);
     doc.setFont('helvetica', 'normal');
-    doc.text(report.action_taken || 'No action recorded.', 110, currentY + 16, { maxWidth: 85 });
+    const actionLines = doc.splitTextToSize(report.action_taken || 'No action recorded.', 85);
+    doc.text(actionLines, 110, currentY + 16);
     
-    currentY = Math.max(currentY + 20 + descHeight, currentY + 20 + actionHeight, currentY + 40);
+    const descH = (descLines.length * 5);
+    const actionH = (actionLines.length * 5);
+    currentY = Math.max(currentY + 20 + descH, currentY + 20 + actionH, currentY + 40);
 
     // Parts Section
     if (report.field_service_report_parts?.length > 0) {
       if (currentY > 230) { doc.addPage(); currentY = 20; }
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.text('4. REPLACEMENT PARTS', 10, currentY);
       doc.line(10, currentY + 2, 200, currentY + 2);
       
@@ -238,18 +243,17 @@ export default function FieldServiceReports() {
       ]);
       
       autoTable(doc, {
-        startY: currentY + 5,
+        startY: currentY + 6,
         head: [['Part Description', 'Quantity', 'Remarks']],
         body: partsData,
         theme: 'grid',
-        headStyles: { fillColor: primaryColor },
-        bodyStyles: { fontSize: 9 }
+        headStyles: { fillColor: secondaryColor, textColor: 255 },
+        bodyStyles: { fontSize: 8 }
       });
       currentY = (doc as any).lastAutoTable.finalY + 15;
     }
 
     // Signatures / Approvals
-    currentY = (doc as any).lastAutoTable.finalY + 15;
     if (currentY > 230) { doc.addPage(); currentY = 20; }
     
     doc.setFillColor(249, 250, 251);
@@ -258,7 +262,7 @@ export default function FieldServiceReports() {
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('3. AUTHORIZATION & SIGN-OFF', 15, currentY + 8);
+    doc.text(`${report.field_service_report_parts?.length > 0 ? '5' : '4'}. AUTHORIZATION & SIGN-OFF`, 15, currentY + 8);
     
     doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
     doc.setFontSize(8);
