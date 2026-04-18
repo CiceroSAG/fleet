@@ -16,7 +16,8 @@ export async function getSettings() {
     utilization: true,
     reports: true,
     user_management: true,
-    technicians: true
+    technicians: true,
+    field_service_reports: true
   };
 
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
@@ -706,6 +707,12 @@ export async function getRepairLogs() {
       equipment (
         asset_tag,
         type
+      ),
+      repair_technicians (
+        technicians (
+          id,
+          name
+        )
       )
     `)
     .order('date_reported', { ascending: false });
@@ -714,7 +721,7 @@ export async function getRepairLogs() {
   return data;
 }
 
-export async function createRepairLog(log: any, scheduleId?: string) {
+export async function createRepairLog(log: any, technicianIds: string[] = [], scheduleId?: string) {
   console.log('Creating repair log:', log);
 
   // Sanitize empty strings to null to prevent database errors (e.g. for DATE fields)
@@ -740,8 +747,19 @@ export async function createRepairLog(log: any, scheduleId?: string) {
     console.error('Supabase error creating repair log:', error);
     throw error;
   }
+
+  const newLog = data[0];
+
+  // Add technicians
+  if (technicianIds.length > 0) {
+    const techLinks = technicianIds.map(techId => ({
+      repair_log_id: newLog.id,
+      technician_id: techId
+    }));
+    await supabase.from('repair_technicians').insert(techLinks);
+  }
   
-  console.log('Repair log created successfully:', data[0]);
+  console.log('Repair log created successfully:', newLog);
   
   // Sync Equipment Status
   if (data && data[0]) {
@@ -778,7 +796,7 @@ export async function createRepairLog(log: any, scheduleId?: string) {
   return data[0];
 }
 
-export async function updateRepairLog(id: string, log: any) {
+export async function updateRepairLog(id: string, log: any, technicianIds: string[] = []) {
   console.log('Updating repair log:', id, log);
 
   // Sanitize empty strings to null
@@ -804,7 +822,22 @@ export async function updateRepairLog(id: string, log: any) {
     throw error;
   }
   
-  console.log('Repair log updated successfully:', data[0]);
+  const updatedLog = data[0];
+
+  // Update technicians
+  // First remove existing
+  await supabase.from('repair_technicians').delete().eq('repair_log_id', id);
+  
+  // Then add new ones
+  if (technicianIds.length > 0) {
+    const techLinks = technicianIds.map(techId => ({
+      repair_log_id: id,
+      technician_id: techId
+    }));
+    await supabase.from('repair_technicians').insert(techLinks);
+  }
+  
+  console.log('Repair log updated successfully:', updatedLog);
   
   // Sync Equipment Status
   if (data && data[0]) {
@@ -3321,7 +3354,7 @@ export async function getPeerComparison(operatorId: string) {
 }
 
 // --- Field Service Reports ---
-export async function createFieldServiceReport(report: any, assets: any[], parts: any[], scheduleId?: string) {
+export async function createFieldServiceReport(report: any, assets: any[], parts: any[], scheduleId?: string, technicianIds: string[] = []) {
   // Sanitize empty strings to null
   const sanitize = (obj: any) => {
     const newObj = { ...obj };
@@ -3351,6 +3384,15 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
   if (reportError) throw reportError;
 
   const reportId = reportData.id;
+
+  // Add technicians
+  if (technicianIds.length > 0) {
+    const techLinks = technicianIds.map(techId => ({
+      report_id: reportId,
+      technician_id: techId
+    }));
+    await supabase.from('field_service_report_technicians').insert(techLinks);
+  }
 
   // Insert assets
   if (sanitizedAssets.length > 0) {
@@ -3383,7 +3425,7 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
           parts_ordered: sanitizedReport.parts_ordered,
           status: sanitizedReport.status === 'completed' ? 'completed' : 
                   sanitizedReport.status === 'in_progress' ? 'in_progress' : 'scheduled'
-        }, [], scheduleId);
+        }, technicianIds, scheduleId);
       } 
       
       // 2. Handle Repair (Automatic creation if any repair type is selected)
@@ -3403,7 +3445,7 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
           status: sanitizedReport.status === 'completed' ? 'completed' : 
                   sanitizedReport.status === 'in_progress' ? 'in_progress' : 'pending',
           cost: 0
-        }, scheduleId);
+        }, technicianIds, scheduleId);
       }
 
       // 3. Handle Incident (Automatic creation if any safety type is selected)
@@ -3447,7 +3489,7 @@ export async function createFieldServiceReport(report: any, assets: any[], parts
   return reportData;
 }
 
-export async function updateFieldServiceReport(id: string, report: any, assets: any[], parts: any[]) {
+export async function updateFieldServiceReport(id: string, report: any, assets: any[], parts: any[], technicianIds: string[] = []) {
   // Sanitize empty strings to null
   const sanitize = (obj: any) => {
     const newObj = { ...obj };
@@ -3474,6 +3516,16 @@ export async function updateFieldServiceReport(id: string, report: any, assets: 
     .single();
 
   if (reportError) throw reportError;
+
+  // Update technicians
+  await supabase.from('field_service_report_technicians').delete().eq('report_id', id);
+  if (technicianIds.length > 0) {
+    const techLinks = technicianIds.map(techId => ({
+      report_id: id,
+      technician_id: techId
+    }));
+    await supabase.from('field_service_report_technicians').insert(techLinks);
+  }
 
   // Delete existing assets and parts
   await supabase.from('field_service_report_assets').delete().eq('report_id', id);
@@ -3558,7 +3610,13 @@ export async function getFieldServiceReports() {
         *,
         equipment (asset_tag, model)
       ),
-      field_service_report_parts (*)
+      field_service_report_parts (*),
+      field_service_report_technicians (
+        technicians (
+          id,
+          name
+        )
+      )
     `)
     .order('created_at', { ascending: false });
 

@@ -164,7 +164,7 @@ export default function Maintenance() {
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[450px]">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -180,7 +180,7 @@ export default function Maintenance() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredLogs?.map((log) => {
+              {filteredLogs?.map((log, index) => {
                 const equip = equipment?.find(e => e.id === log.equipment_id);
                 const techs = log.maintenance_technicians?.map((mt: any) => mt.technicians?.name).filter(Boolean) || [];
                 
@@ -258,7 +258,9 @@ export default function Maintenance() {
                           <MoreVertical className="w-5 h-5" />
                         </button>
                         {openMenuId === log.id && (
-                          <div className="absolute right-0 top-8 w-36 bg-white rounded-lg shadow-lg border border-gray-100 z-10 py-1">
+                          <div className={`absolute right-0 w-36 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 ${
+                            index > (filteredLogs?.length || 0) - 3 && (filteredLogs?.length || 0) > 3 ? 'bottom-full mb-2' : 'top-8'
+                          }`}>
                             {profile?.role !== 'Technician' && log.approval_status !== 'approved' && (
                               <button
                                 onClick={() => handleApprove(log.id)}

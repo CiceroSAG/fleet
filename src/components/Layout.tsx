@@ -42,7 +42,7 @@ export default function Layout() {
     { to: '/compliance', icon: FileText, label: 'Compliance', feature: 'compliance', roles: ['Admin', 'Manager', 'Operator'] },
     { to: '/utilization', icon: Activity, label: 'Utilization', feature: 'utilization', roles: ['Admin', 'Manager'] },
     { to: '/reports', icon: FileText, label: 'Reports', feature: 'reports', roles: ['Admin', 'Manager'] },
-    { to: '/field-service-reports', icon: FileText, label: 'Field Service Reports', roles: ['Admin', 'Manager', 'Technician'] },
+    { to: '/field-service-reports', icon: FileText, label: 'Field Service Reports', feature: 'field_service_reports', roles: ['Admin', 'Manager', 'Technician'] },
     { to: '/users', icon: Users, label: 'User Management', feature: 'user_management', roles: ['Admin'] },
     { to: '/technicians', icon: Wrench, label: 'Technicians', feature: 'technicians', roles: ['Admin', 'Manager', 'Technician'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['Admin', 'Manager'] },

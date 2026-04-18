@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEquipment, getTechnicians, createFieldServiceReport, updateFieldServiceReport, getTechnicianByUserId } from '../lib/api';
-import { Plus, Trash2, Save, X, Building2, Wrench, Package, UserCheck, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Save, X, Building2, Wrench, Package, UserCheck, ShieldCheck, CheckCircle2, AlertTriangle, User, ChevronDown, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth';
 
@@ -22,6 +22,7 @@ interface FieldServiceReportFormProps {
     kamoa_hod_name?: string;
     kamoa_hod_date?: string;
     technician_id?: string;
+    technician_ids?: string[];
     report_date?: string;
     status?: string;
     parts_replaced?: string;
@@ -36,10 +37,14 @@ interface FieldServiceReportFormProps {
 
 export default function FieldServiceReportForm({ onClose, initialData }: FieldServiceReportFormProps) {
   const queryClient = useQueryClient();
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const { profile } = useAuth();
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
   const { data: technicians } = useQuery({ queryKey: ['technicians'], queryFn: getTechnicians });
 
+  const [selectedTechnicians, setSelectedTechnicians] = useState<string[]>([]);
+  const [isTechDropdownOpen, setIsTechDropdownOpen] = useState(false);
+  
   const { data: technicianRecord } = useQuery({
     queryKey: ['technicianRecord', profile?.id],
     queryFn: () => profile?.id ? getTechnicianByUserId(profile.id) : null,
@@ -83,20 +88,43 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
   });
 
   // Update technician name when record is loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (technicianRecord?.name) {
       setReport(prev => ({ ...prev, technician_name: technicianRecord.name }));
+      if (!selectedTechnicians.includes(technicianRecord.id)) {
+        setSelectedTechnicians(prev => [...prev, technicianRecord.id]);
+      }
     }
   }, [technicianRecord]);
 
+  useEffect(() => {
+    if (initialData?.technician_ids) {
+      setSelectedTechnicians(initialData.technician_ids);
+    } else if (initialData?.technician_id) {
+      setSelectedTechnicians([initialData.technician_id]);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsTechDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [assets, setAssets] = useState(initialData?.assets || [{ equipment_id: '', index_value: 0, next_service_date: '' }]);
   const [parts, setParts] = useState(initialData?.parts || [{ part_description: '', quantity_used: 0, remark: '' }]);
+  const [customMaintField, setCustomMaintField] = useState('');
+  const [customRepairField, setCustomRepairField] = useState('');
 
   const mutation = useMutation({
-    mutationFn: (data: { report: any; assets: any[]; parts: any[] }) => 
+    mutationFn: (data: { report: any; assets: any[]; parts: any[]; technician_ids: string[] }) => 
       initialData?.id 
-        ? updateFieldServiceReport(initialData.id, data.report, data.assets, data.parts)
-        : createFieldServiceReport(data.report, data.assets, data.parts, initialData?.scheduleId),
+        ? updateFieldServiceReport(initialData.id, data.report, data.assets, data.parts, data.technician_ids)
+        : createFieldServiceReport(data.report, data.assets, data.parts, initialData?.scheduleId, data.technician_ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fieldServiceReports'] });
       queryClient.invalidateQueries({ queryKey: ['maintenanceLogs'] });
@@ -136,13 +164,54 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
     setParts(newParts);
   };
 
+  const addCustomMaint = () => {
+    if (customMaintField.trim()) {
+      const key = customMaintField.trim().toLowerCase().replace(/\s+/g, '_');
+      setReport({
+        ...report,
+        maintenance_details: { ...report.maintenance_details, [key]: true }
+      });
+      setCustomMaintField('');
+    }
+  };
+
+  const addCustomRepair = () => {
+    if (customRepairField.trim()) {
+      const key = customRepairField.trim().toLowerCase().replace(/\s+/g, '_');
+      setReport({
+        ...report,
+        repair_details: { ...report.repair_details, [key]: true }
+      });
+      setCustomRepairField('');
+    }
+  };
+
+  const removeCustomMaint = (key: string) => {
+    const newMaint = { ...report.maintenance_details };
+    delete newMaint[key];
+    setReport({ ...report, maintenance_details: newMaint });
+  };
+
+  const removeCustomRepair = (key: string) => {
+    const newRepair = { ...report.repair_details };
+    delete newRepair[key];
+    setReport({ ...report, repair_details: newRepair });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     mutation.mutate({
       report,
       assets: assets.filter(a => a.equipment_id),
-      parts: parts.filter(p => p.part_description)
+      parts: parts.filter(p => p.part_description),
+      technician_ids: selectedTechnicians
     });
+  };
+
+  const toggleTechnician = (id: string) => {
+    setSelectedTechnicians(prev => 
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
   };
 
   return (
@@ -238,23 +307,50 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                 <CheckCircle2 className="w-5 h-5" />
                 <h3 className="font-semibold uppercase tracking-wider text-[10px]">Maintenance Checklist</h3>
               </div>
-              <div className="space-y-2">
-                {['inspection', 'oil_change', 'greasing', 'other'].map((type) => (
-                  <label key={type} className="flex items-center space-x-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={report.maintenance_details?.[type] || false}
-                      onChange={(e) => setReport({
-                        ...report,
-                        maintenance_details: { ...report.maintenance_details, [type]: e.target.checked }
-                      })}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-xs text-gray-700 capitalize group-hover:text-blue-600 transition-colors">
-                      {type.replace('_', ' ')}
-                    </span>
-                  </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {Object.keys(report.maintenance_details).map((type) => (
+                  <div key={type} className="flex items-center justify-between group/item">
+                    <label className="flex items-center space-x-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={report.maintenance_details[type] || false}
+                        onChange={(e) => setReport({
+                          ...report,
+                          maintenance_details: { ...report.maintenance_details, [type]: e.target.checked }
+                        })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-700 capitalize group-hover:text-blue-600 transition-colors">
+                        {type.replace(/_/g, ' ')}
+                      </span>
+                    </label>
+                    {!['inspection', 'oil_change', 'greasing', 'other'].includes(type) && (
+                      <button
+                        type="button"
+                        onClick={() => removeCustomMaint(type)}
+                        className="opacity-0 group-hover/item:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 ))}
+              </div>
+              <div className="flex items-center space-x-2 pt-2 border-t border-blue-50 mt-2">
+                <input
+                  type="text"
+                  value={customMaintField}
+                  onChange={(e) => setCustomMaintField(e.target.value)}
+                  placeholder="Custom Item"
+                  className="flex-1 px-2 py-1 text-xs border border-blue-100 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomMaint}
+                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
               </div>
             </section>
 
@@ -264,23 +360,50 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
                 <Wrench className="w-5 h-5" />
                 <h3 className="font-semibold uppercase tracking-wider text-[10px]">Repair types</h3>
               </div>
-              <div className="space-y-2">
-                {['mechanical', 'electrical', 'hydraulic', 'body_work', 'tires'].map((type) => (
-                  <label key={type} className="flex items-center space-x-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={report.repair_details?.[type] || false}
-                      onChange={(e) => setReport({
-                        ...report,
-                        repair_details: { ...report.repair_details, [type]: e.target.checked }
-                      })}
-                      className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                    />
-                    <span className="text-xs text-gray-700 capitalize group-hover:text-orange-600 transition-colors">
-                      {type.replace('_', ' ')}
-                    </span>
-                  </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {Object.keys(report.repair_details).map((type) => (
+                  <div key={type} className="flex items-center justify-between group/item">
+                    <label className="flex items-center space-x-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={report.repair_details[type] || false}
+                        onChange={(e) => setReport({
+                          ...report,
+                          repair_details: { ...report.repair_details, [type]: e.target.checked }
+                        })}
+                        className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-xs text-gray-700 capitalize group-hover:text-orange-600 transition-colors">
+                        {type.replace(/_/g, ' ')}
+                      </span>
+                    </label>
+                    {!['mechanical', 'electrical', 'hydraulic', 'body_work', 'tires'].includes(type) && (
+                      <button
+                        type="button"
+                        onClick={() => removeCustomRepair(type)}
+                        className="opacity-0 group-hover/item:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 ))}
+              </div>
+              <div className="flex items-center space-x-2 pt-2 border-t border-orange-50 mt-2">
+                <input
+                  type="text"
+                  value={customRepairField}
+                  onChange={(e) => setCustomRepairField(e.target.value)}
+                  placeholder="Custom Repair"
+                  className="flex-1 px-2 py-1 text-xs border border-orange-100 rounded focus:ring-1 focus:ring-orange-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomRepair}
+                  className="p-1 text-orange-600 hover:bg-orange-100 rounded transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
               </div>
             </section>
 
@@ -543,17 +666,47 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Technician</label>
-                <select
-                  value={report.technician_name || ''}
-                  onChange={e => setReport({ ...report, technician_name: e.target.value })}
-                  className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
-                >
-                  <option value="">Select Technician</option>
-                  {technicians?.map(t => (
-                    <option key={t.id} value={t.name}>{t.name}</option>
-                  ))}
-                </select>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Technicians</label>
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsTechDropdownOpen(!isTechDropdownOpen)}
+                    className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-orange-500 outline-none flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-2 overflow-hidden">
+                      <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="text-sm truncate text-gray-700">
+                        {selectedTechnicians.length > 0 
+                          ? `${selectedTechnicians.length} Selected`
+                          : 'Select Technicians'
+                        }
+                      </span>
+                    </div>
+                    <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isTechDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <AnimatePresence>
+                    {isTechDropdownOpen && (
+                      <div className="absolute z-50 w-full mb-1 bottom-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto">
+                        {technicians?.map((tech: any) => (
+                          <button
+                            key={tech.id}
+                            type="button"
+                            onClick={() => toggleTechnician(tech.id)}
+                            className="w-full px-4 py-2 text-sm text-left hover:bg-orange-50 flex items-center justify-between group transition-colors"
+                          >
+                            <span className={`${selectedTechnicians.includes(tech.id) ? 'text-orange-600 font-medium' : 'text-gray-700'}`}>
+                              {tech.name}
+                            </span>
+                            {selectedTechnicians.includes(tech.id) && (
+                              <Check className="w-4 h-4 text-orange-600" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
                 <input
                   type="date"
                   value={report.report_date || ''}

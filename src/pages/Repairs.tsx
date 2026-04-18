@@ -90,7 +90,7 @@ export default function Repairs() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -99,13 +99,14 @@ export default function Repairs() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Repair Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Reported</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Technicians</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredLogs?.map((log) => {
+              {filteredLogs?.map((log, index) => {
                 const equip = equipment?.find(e => e.id === log.equipment_id);
                 return (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
@@ -123,6 +124,25 @@ export default function Repairs() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       ${log.cost?.toLocaleString() || '0'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex -space-x-1">
+                        {log.repair_technicians?.length > 0 ? (
+                          log.repair_technicians.map((rt: any, i: number) => (
+                            <div 
+                              key={i} 
+                              className="h-6 w-6 rounded-full ring-2 ring-white bg-gray-100 flex items-center justify-center"
+                              title={rt.technicians?.name}
+                            >
+                              <span className="text-[10px] font-medium text-gray-600">
+                                {rt.technicians?.name?.split(' ').map((n: any) => n[0]).join('')}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">None</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                       {log.schedule_id ? (
@@ -152,7 +172,9 @@ export default function Repairs() {
                       </button>
                       
                       {openMenuId === log.id && (
-                        <div className="absolute right-6 top-10 w-36 bg-white rounded-lg shadow-lg border border-gray-100 z-10 py-1">
+                        <div className={`absolute right-6 w-36 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 ${
+                          index > (filteredLogs?.length || 0) - 3 && (filteredLogs?.length || 0) > 3 ? 'bottom-full mb-2' : 'top-10'
+                        }`}>
                           <button
                             onClick={() => handleEdit(log)}
                             className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

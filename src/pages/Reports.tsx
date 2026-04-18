@@ -83,27 +83,73 @@ export default function Reports() {
 
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
-  const exportToPDF = (reportType: string) => {
+  const exportToPDF = async (reportType: string) => {
     const doc = new jsPDF();
     const timestamp = new Date().toLocaleString();
+    const brandName = settings?.company_name || 'Fleet Management System';
+    const primaryColor: [number, number, number] = [249, 115, 22]; // Orange-500
+    const secondaryColor: [number, number, number] = [55, 65, 81]; // Gray-700
+    const accentColor: [number, number, number] = [255, 247, 237]; // Orange-50
     
     // Header Design
-    doc.setFillColor(249, 115, 22); // Orange-500
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, 210, 50, 'F');
+    
+    // Branding in Header
+    let headerX = 15;
+    if (settings?.logo_url) {
+      try {
+        const img = new Image();
+        img.src = settings.logo_url;
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', 15, 12, 26, 26);
+        headerX = 45;
+      } catch (error) {
+        console.error('Error adding logo to PDF:', error);
+      }
+    }
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text('FLEET MANAGEMENT SYSTEM', 105, 18, { align: 'center' });
+    doc.text(brandName, headerX, 22);
     
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${reportType.toUpperCase()} REPORT`, 105, 28, { align: 'center' });
+    doc.text(`${reportType.toUpperCase()} REPORT - LOGISTICS & FLEET MANAGEMENT`, headerX, 32);
+    doc.setFontSize(9);
+    doc.text(`KAMOA COPPER PROJECTS • OFFICAL DOCUMENTATION`, headerX, 40);
     
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${timestamp}`, 10, 50);
-    doc.text(`Fleet Summary: Distance: ${totalDistance.toLocaleString()} km | Fuel: ${currencySymbol}${totalFuelCost.toLocaleString()} | Maint: ${currencySymbol}${totalMaintenanceCost.toLocaleString()}`, 10, 56);
+    // Summary Banner
+    doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.rect(0, 50, 210, 15, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.text(`DATE GENERATED: ${timestamp.toUpperCase()}`, 15, 59);
+    doc.text(`CURRENCY: ${settings?.currency || 'USD'}`, 195, 59, { align: 'right' });
+    
+    // Analytics Bar
+    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.roundedRect(10, 70, 190, 22, 2, 2, 'F');
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FLEET ANALYTICS INSIGHTS', 15, 78);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    
+    const summaryText = `TOTAL DISTANCE: ${totalDistance.toLocaleString()} KM  |  FUEL COSTS: ${currencySymbol}${totalFuelCost.toLocaleString()}  |  MAINTENANCE COSTS: ${currencySymbol}${totalMaintenanceCost.toLocaleString()}`;
+    doc.text(summaryText, 15, 85);
 
     let tableData: any[] = [];
     let columns: string[] = [];
@@ -147,17 +193,14 @@ export default function Reports() {
         inc.description
       ]) || [];
     } else if (reportType === 'Field Service Reports') {
-      columns = ['Date', 'Technician', 'Workplace', 'Type', 'Status', 'Checklists'];
+      columns = ['Date', 'Technician', 'Workplace', 'Type', 'Status', 'Checks'];
       tableData = reports?.map(report => {
         const checks = [];
         if (report.maintenance_details) {
-          Object.entries(report.maintenance_details).forEach(([k, v]) => v && checks.push(`M:${k}`));
+          Object.entries(report.maintenance_details).forEach(([k, v]) => v && checks.push(`M:${k[0]}`));
         }
         if (report.repair_details) {
-          Object.entries(report.repair_details).forEach(([k, v]) => v && checks.push(`R:${k}`));
-        }
-        if (report.safety_details?.incident_type && report.safety_details.incident_type !== 'none') {
-          checks.push(`S:${report.safety_details.incident_type}`);
+          Object.entries(report.repair_details).forEach(([k, v]) => v && checks.push(`R:${k[0]}`));
         }
         return [
           new Date(report.report_date).toLocaleDateString(),
@@ -165,19 +208,28 @@ export default function Reports() {
           report.workplace,
           report.job_type,
           report.status,
-          checks.join(', ')
+          checks.join(',')
         ];
       }) || [];
     }
 
     autoTable(doc, {
-      startY: 65,
+      startY: 100,
       head: [columns],
       body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [249, 115, 22], textColor: 255 },
-      alternateRowStyles: { fillColor: [255, 247, 237] },
-      margin: { top: 65 },
+      theme: 'grid',
+      headStyles: { fillColor: primaryColor as any, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { top: 95, left: 10, right: 10 },
+      didDrawPage: (data) => {
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`FANED MINING SERVICES SARL - Confidential Official Documentation`, 105, 285, { align: 'center' });
+        doc.text(`Page ${(doc as any).internal.getNumberOfPages()}`, 105, 290, { align: 'center' });
+        doc.text(`Kamoa Copper Projects - Integrated Logistics & Maintenance Report`, 10, 290);
+      }
     });
 
     doc.save(`Fleet_${reportType.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -235,11 +287,11 @@ export default function Reports() {
 
   const reportTypes = [
     { title: 'Fleet Utilization', description: 'Detailed analysis of equipment usage and idle time.', icon: PieChart, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-    { title: 'Field Service Reports', description: 'Technician on-site reports and maintenance checklists.', icon: FileText, color: 'text-purple-600', bgColor: 'bg-purple-50' },
-    { title: 'Fuel Consumption', description: 'Fuel efficiency and cost analysis across the fleet.', icon: TrendingUp, color: 'text-green-600', bgColor: 'bg-green-50' },
-    { title: 'Maintenance Summary', description: 'Overview of completed and pending service tasks.', icon: BarChart3, color: 'text-orange-600', bgColor: 'bg-orange-50' },
-    { title: 'Safety & Incidents', description: 'Incident reports and safety compliance metrics.', icon: AlertCircle, color: 'text-red-600', bgColor: 'bg-red-50' },
-  ];
+    { title: 'Field Service Reports', description: 'Technician on-site reports and maintenance checklists.', icon: FileText, color: 'text-purple-600', bgColor: 'bg-purple-50', feature: 'field_service_reports' },
+    { title: 'Fuel Consumption', description: 'Fuel efficiency and cost analysis across the fleet.', icon: TrendingUp, color: 'text-green-600', bgColor: 'bg-green-50', feature: 'fuel_management' },
+    { title: 'Maintenance Summary', description: 'Overview of completed and pending service tasks.', icon: BarChart3, color: 'text-orange-600', bgColor: 'bg-orange-50', feature: 'maintenance' },
+    { title: 'Safety & Incidents', description: 'Incident reports and safety compliance metrics.', icon: AlertCircle, color: 'text-red-600', bgColor: 'bg-red-50', feature: 'incidents' },
+  ].filter(report => !report.feature || settings?.features?.[report.feature as keyof typeof settings.features]);
 
   return (
     <div className="space-y-8">

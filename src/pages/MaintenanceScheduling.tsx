@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getMaintenanceSchedulesWithUnderMaintenance, getMaintenanceWorkload, autoAssignMaintenance, checkPartsAvailability, getMaintenanceOptimization } from '@/lib/api';
+import { getMaintenanceSchedulesWithUnderMaintenance, getMaintenanceWorkload, autoAssignMaintenance, checkPartsAvailability, getMaintenanceOptimization, getSettings } from '@/lib/api';
 import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap, Plus, Edit2, ClipboardList } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -47,6 +47,11 @@ export default function MaintenanceScheduling() {
   const [completingSchedule, setCompletingSchedule] = useState<any>(null);
 
   const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings
+  });
 
   useEffect(() => {
     fetchMaintenanceSchedules();
@@ -473,7 +478,7 @@ export default function MaintenanceScheduling() {
                                   Repair Log ({new Date(log.date_reported).toLocaleDateString()})
                                 </Link>
                               ))}
-                              {schedule.field_service_reports?.map((report: any) => (
+                              {settings?.features?.field_service_reports && schedule.field_service_reports?.map((report: any) => (
                                 <Link key={report.id} to="/field-service-reports" className="inline-flex items-center px-2 py-1 rounded bg-green-50 text-green-700 text-[10px] font-medium hover:bg-green-100 transition-colors border border-green-100">
                                   <ClipboardList className="w-3 h-3 mr-1" />
                                   FSR ({new Date(report.report_date).toLocaleDateString()}) - {report.status || 'pending'}

@@ -30,6 +30,10 @@ export default function EquipmentList() {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       setOpenMenuId(null);
     },
+    onError: (error: any) => {
+      console.error('Delete error:', error);
+      alert(`Could not delete equipment. It may be referenced by other records (maintenance logs, fuel logs, etc.). Please delete related records first or ensure database cascading is enabled.\n\nError: ${error.message || 'Unknown error'}`);
+    }
   });
 
   const filteredEquipment = equipment?.filter(item => {
@@ -109,7 +113,7 @@ export default function EquipmentList() {
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[450px]">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -121,8 +125,8 @@ export default function EquipmentList() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEquipment?.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+              {filteredEquipment?.map((item, index) => (
+                <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="bg-orange-100 p-2 rounded-lg mr-3">
@@ -190,7 +194,9 @@ export default function EquipmentList() {
                       </button>
 
                       {openMenuId === item.id && (
-                        <div className="absolute right-0 top-10 w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-10 py-1">
+                        <div className={`absolute right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 ${
+                          index > filteredEquipment.length - 3 && filteredEquipment.length > 3 ? 'bottom-full mb-2' : 'top-10'
+                        }`}>
                           <button
                             onClick={() => handleEdit(item)}
                             className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"

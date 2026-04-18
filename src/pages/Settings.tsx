@@ -39,7 +39,8 @@ export default function Settings() {
       utilization: true,
       reports: true,
       user_management: true,
-      technicians: true
+      technicians: true,
+      field_service_reports: true
     }
   });
 
@@ -158,7 +159,8 @@ export default function Settings() {
     utilization: 'Utilization',
     reports: 'Reports',
     user_management: 'User Management',
-    technicians: 'Technicians'
+    technicians: 'Technicians',
+    field_service_reports: 'Field Service Reports'
   };
 
   return (

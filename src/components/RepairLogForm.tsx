@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getEquipment, createRepairLog, updateRepairLog } from '../lib/api';
-import { X, Save, AlertCircle } from 'lucide-react';
+import { getEquipment, createRepairLog, updateRepairLog, getTechnicians } from '../lib/api';
+import { X, Save, AlertCircle, User, ChevronDown, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface RepairLogFormProps {
   log?: any;
@@ -11,8 +12,12 @@ interface RepairLogFormProps {
 
 export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormProps) {
   const queryClient = useQueryClient();
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
+  const { data: technicians } = useQuery({ queryKey: ['technicians'], queryFn: getTechnicians });
 
+  const [selectedTechnicians, setSelectedTechnicians] = useState<string[]>([]);
+  const [isTechDropdownOpen, setIsTechDropdownOpen] = useState(false);
   const [formData, setFormData] = useState({
     equipment_id: schedule?.equipment_id || '',
     repair_type: 'mechanical',
@@ -26,6 +31,16 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
     workplace: '',
     index_value: '',
   });
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsTechDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (log) {
@@ -42,6 +57,10 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
         workplace: log.workplace || '',
         index_value: log.index_value?.toString() || '',
       });
+
+      if (log.repair_technicians) {
+        setSelectedTechnicians(log.repair_technicians.map((rt: any) => rt.technicians?.id || rt.technician_id));
+      }
     } else if (schedule) {
       setFormData(prev => ({
         ...prev,
@@ -61,7 +80,7 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => log ? updateRepairLog(log.id, data) : createRepairLog(data, schedule?.id),
+    mutationFn: (data: any) => log ? updateRepairLog(log.id, data, selectedTechnicians) : createRepairLog(data, selectedTechnicians, schedule?.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repairLogs'] });
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
@@ -86,6 +105,12 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
       ...prev,
       [name]: name === 'cost' || name === 'index_value' ? parseFloat(value) || 0 : value,
     }));
+  };
+
+  const toggleTechnician = (id: string) => {
+    setSelectedTechnicians(prev => 
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
   };
 
   return (
@@ -161,17 +186,50 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  name="status"
-                  value={formData.status || ''}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Technicians</label>
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsTechDropdownOpen(!isTechDropdownOpen)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all flex items-center justify-between bg-white"
+                  >
+                    <div className="flex items-center space-x-2 overflow-hidden">
+                      <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="text-sm truncate text-gray-700">
+                        {selectedTechnicians.length > 0 
+                          ? `${selectedTechnicians.length} Selected`
+                          : 'Select Technicians'
+                        }
+                      </span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isTechDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <AnimatePresence>
+                    {isTechDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-60 overflow-y-auto">
+                        {technicians?.map((tech: any) => (
+                          <button
+                            key={tech.id}
+                            type="button"
+                            onClick={() => toggleTechnician(tech.id)}
+                            className="w-full px-4 py-2 text-sm text-left hover:bg-orange-50 flex items-center justify-between group transition-colors"
+                          >
+                            <span className={`${selectedTechnicians.includes(tech.id) ? 'text-orange-600 font-medium' : 'text-gray-700'}`}>
+                              {tech.name}
+                            </span>
+                            {selectedTechnicians.includes(tech.id) && (
+                              <Check className="w-4 h-4 text-orange-600" />
+                            )}
+                          </button>
+                        ))}
+                        {(!technicians || technicians.length === 0) && (
+                          <div className="px-4 py-2 text-sm text-gray-500 italic">No technicians found</div>
+                        )}
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
 
@@ -188,6 +246,22 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  name="status"
+                  value={formData.status || ''}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Cost</label>
                 <input
                   type="number"
@@ -198,9 +272,6 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Index Value (Hours/KM)</label>
                 <input
@@ -209,17 +280,6 @@ export default function RepairLogForm({ log, schedule, onClose }: RepairLogFormP
                   value={formData.index_value || ''}
                   onChange={handleChange}
                   placeholder="Current reading"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Workplace</label>
-                <input
-                  type="text"
-                  name="workplace"
-                  value={formData.workplace || ''}
-                  onChange={handleChange}
-                  placeholder="Location"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                 />
               </div>

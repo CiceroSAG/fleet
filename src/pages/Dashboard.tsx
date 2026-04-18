@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getEquipment, getOperators, getMaintenanceLogs, getFuelLogs, getAssignedMaintenanceSchedules, getFieldServiceReports, getRepairLogs, getMaintenanceSchedules } from '../lib/api';
+import { getEquipment, getOperators, getMaintenanceLogs, getFuelLogs, getAssignedMaintenanceSchedules, getFieldServiceReports, getRepairLogs, getMaintenanceSchedules, getSettings } from '../lib/api';
 import { Truck, Users, ClipboardList, Fuel, TrendingUp, BarChart3, PieChart, FileText, ChevronRight, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import FieldServiceReportForm from '../components/FieldServiceReportForm';
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const { data: fsr } = useQuery({ queryKey: ['fieldServiceReports'], queryFn: getFieldServiceReports });
   const { data: repairLogs } = useQuery({ queryKey: ['repairLogs'], queryFn: getRepairLogs });
   const { data: schedules } = useQuery({ queryKey: ['maintenanceSchedules'], queryFn: getMaintenanceSchedules });
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings });
   const { data: assignedTasks } = useQuery({ 
     queryKey: ['assignedTasks', session?.user?.id], 
     queryFn: () => getAssignedMaintenanceSchedules(session?.user?.id || ''),
@@ -78,9 +79,10 @@ export default function Dashboard() {
       value: fsr?.length || 0, 
       icon: FileText, 
       color: 'text-purple-600', 
-      bgColor: 'bg-purple-50' 
+      bgColor: 'bg-purple-50',
+      feature: 'field_service_reports'
     },
-  ];
+  ].filter(stat => !stat.feature || settings?.features?.[stat.feature as keyof typeof settings.features]);
 
   // Prepare chart data
   const statusData = useMemo(() => {
@@ -296,13 +298,15 @@ export default function Dashboard() {
                       <Clock className="w-3 h-3" />
                       <span className="text-[10px] font-medium">Due: {new Date(task.next_due).toLocaleDateString()}</span>
                     </div>
-                    <button
-                      onClick={() => setSelectedSchedule(task)}
-                      className="flex items-center space-x-1 text-orange-600 hover:text-orange-700 text-xs font-bold transition-colors"
-                    >
-                      <span>Submit FSR</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    {settings?.features?.field_service_reports && (
+                      <button
+                        onClick={() => setSelectedSchedule(task)}
+                        className="flex items-center space-x-1 text-orange-600 hover:text-orange-700 text-xs font-bold transition-colors"
+                      >
+                        <span>Submit FSR</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -338,25 +342,27 @@ export default function Dashboard() {
         </div>
 
         {/* Field Service Activity */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-purple-600" />
-              Field Service Activity
-            </h2>
+        {settings?.features?.field_service_reports && (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-600" />
+                Field Service Activity
+              </h2>
+            </div>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={fsrActivityData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="count" stroke="#9333ea" strokeWidth={3} dot={{ r: 4, fill: '#9333ea' }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={fsrActivityData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="#9333ea" strokeWidth={3} dot={{ r: 4, fill: '#9333ea' }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        )}
 
         {/* Recent Equipment */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -387,7 +393,7 @@ export default function Dashboard() {
         </div>
 
         {/* Top Technicians (Admin Only) */}
-        {profile?.role === 'Admin' && (
+        {profile?.role === 'Admin' && settings?.features?.field_service_reports && (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-orange-600" />

@@ -57,13 +57,17 @@ export default function FieldServiceReports() {
 
   const downloadSingleReportPDF = async (report: any) => {
     const doc = new jsPDF();
-    const brandName = settings?.company_name || 'Fleet Management System';
+    const brandName = settings?.company_name || 'FANED MINING SERVICES SARL';
+    const primaryColor: [number, number, number] = [249, 115, 22]; // Orange-500
+    const secondaryColor: [number, number, number] = [55, 65, 81]; // Gray-700
+    const accentColor: [number, number, number] = [255, 247, 237]; // Orange-50
     
     // Header
-    doc.setFillColor(249, 115, 22); // Orange-500
-    doc.rect(0, 0, 210, 30, 'F');
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, 210, 45, 'F');
     
-    // Add Logo if exists
+    // Header Content
+    let headerX = 15;
     if (settings?.logo_url) {
       try {
         const img = new Image();
@@ -73,73 +77,109 @@ export default function FieldServiceReports() {
           img.onload = resolve;
           img.onerror = reject;
         });
-        // Calculate dimensions to fit in header (max height 20mm)
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = img.width;
         canvas.height = img.height;
         ctx?.drawImage(img, 0, 0);
         const imgData = canvas.toDataURL('image/png');
-        
-        doc.addImage(imgData, 'PNG', 10, 5, 20, 20); // Pos: 10,5, Size: 20x20
+        doc.addImage(imgData, 'PNG', 15, 10, 25, 25);
+        headerX = 45;
       } catch (error) {
         console.error('Error adding logo to PDF:', error);
       }
     }
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text(brandName.toUpperCase(), settings?.logo_url ? 35 : 105, 17, { align: settings?.logo_url ? 'left' : 'center' });
-    doc.setFontSize(10);
-    doc.text('FIELD SERVICE REPORT', settings?.logo_url ? 35 : 105, 24, { align: settings?.logo_url ? 'left' : 'center' });
+    doc.text(brandName, headerX, 22);
     
-    // Meta Info
-    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('FIELD SERVICE REPORT • LOGISTICS & MAINTENANCE • KAMOA COPPER PROJECTS', headerX, 32);
+    
+    // Report Identity Card
+    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.roundedRect(10, 50, 190, 40, 2, 2, 'F');
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(1);
+    doc.line(15, 50, 15, 90); // Accent line
+    
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Report ID: ${report.id.substring(0, 8)}`, 10, 40);
-    doc.text(`Date: ${new Date(report.report_date).toLocaleDateString()}`, 10, 46);
-    doc.text(`Technician: ${report.technician_name}`, 10, 52);
-    doc.text(`Workplace: ${report.workplace}`, 10, 58);
-    doc.text(`Status: ${(report.status || 'Pending').toUpperCase()}`, 10, 64);
+    doc.text('REPORT INFORMATION', 20, 58);
     
-    // Checklists
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`ID:`, 20, 68);
+    doc.text(`DATE:`, 20, 76);
+    doc.text(`TECHNICIANS:`, 20, 84);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(report.id.substring(0, 12).toUpperCase(), 45, 68);
+    doc.text(new Date(report.report_date).toLocaleDateString(), 45, 76);
+    
+    const techNames = report.field_service_report_technicians?.length > 0
+      ? report.field_service_report_technicians.map((rt: any) => rt.technicians?.name).join(', ')
+      : report.technician_name;
+    doc.text((techNames || '').toUpperCase(), 45, 84);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(`WORKPLACE:`, 110, 68);
+    doc.text(`STATUS:`, 110, 76);
+    doc.text(`JOB TYPE:`, 110, 84);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text((report.workplace || '').toUpperCase(), 135, 68);
+    doc.setTextColor(report.status === 'completed' ? 16 : 249, report.status === 'completed' ? 185 : 115, report.status === 'completed' ? 129 : 22);
+    doc.text((report.status || 'Pending').toUpperCase(), 135, 76);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text((report.job_type || 'N/A').toUpperCase(), 135, 84);
+    
+    // Checklists Section
+    let currentY = 105;
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('CHECKLISTS & DETAILS', 10, 75);
+    doc.text('1. INSPECTION CHECKLISTS', 10, currentY);
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.5);
+    doc.line(10, currentY + 2, 200, currentY + 2);
     
     const checklistData = [
       ['MAINTENANCE', report.maintenance_details ? Object.entries(report.maintenance_details)
         .filter(([_, v]) => v)
         .map(([k, _]) => k.replace(/_/g, ' ').toUpperCase())
-        .join(', ') || 'NONE' : 'NONE'],
+        .join(', ') || 'N/A' : 'N/A'],
       ['REPAIRS', report.repair_details ? Object.entries(report.repair_details)
         .filter(([_, v]) => v)
         .map(([k, _]) => k.replace(/_/g, ' ').toUpperCase())
-        .join(', ') || 'NONE' : 'NONE'],
+        .join(', ') || 'N/A' : 'N/A'],
       ['SAFETY & INCIDENTS', report.safety_details?.incident_type !== 'none' 
         ? `${report.safety_details.incident_type.replace(/_/g, ' ').toUpperCase()} (SEVERITY: ${report.safety_details.severity.toUpperCase()})` 
-        : 'NONE']
+        : 'NO INCIDENTS RECORDED']
     ];
-
+    
     autoTable(doc, {
-      startY: 78,
-      head: [['Category', 'Details']],
+      startY: currentY + 6,
+      head: [['Category', 'Details / Observations']],
       body: checklistData,
       theme: 'grid',
-      headStyles: { fillColor: [50, 50, 50] },
+      headStyles: { fillColor: secondaryColor, textColor: 255, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8 },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 50 },
+        0: { fontStyle: 'bold', cellWidth: 50, fillColor: [249, 250, 251] as any },
         1: { cellWidth: 'auto' }
       }
     });
 
-    // Equipment
-    let currentY = (doc as any).lastAutoTable.finalY + 15;
-    doc.setFontSize(12);
+    // Equipment Section
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('EQUIPMENT INVOLVED', 10, currentY);
+    doc.text('2. EQUIPMENT INVOLVED', 10, currentY);
     doc.line(10, currentY + 2, 200, currentY + 2);
     
     const equipmentData = report.field_service_report_assets?.map((a: any) => [
@@ -151,70 +191,108 @@ export default function FieldServiceReports() {
     
     autoTable(doc, {
       startY: currentY + 5,
-      head: [['Asset Tag', 'Model', 'Index', 'Next Service']],
+      head: [['Asset Tag', 'Model / Serial', 'Current Index', 'Next Service Due']],
       body: equipmentData,
-      theme: 'grid',
-      headStyles: { fillColor: [249, 115, 22] }
+      theme: 'striped',
+      headStyles: { fillColor: primaryColor, textColor: 255 },
+      alternateRowStyles: { fillColor: accentColor },
+      bodyStyles: { fontSize: 9 }
     });
     
-    // Description
+    // Job Description & Actions Section
     currentY = (doc as any).lastAutoTable.finalY + 15;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('JOB DESCRIPTION', 10, currentY);
-    doc.line(10, currentY + 2, 200, currentY + 2);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(report.job_description || 'No description provided.', 10, currentY + 8, { maxWidth: 190 });
     
-    // Action Taken
-    currentY += 30; // Approximation, better to calculate height
-    doc.setFontSize(12);
+    // Two column layout for description and actions if they fit, otherwise stack
+    const descHeight = doc.getTextDimensions(report.job_description || '', { maxWidth: 90 }).h;
+    const actionHeight = doc.getTextDimensions(report.action_taken || '', { maxWidth: 90 }).h;
+    
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('ACTION TAKEN', 10, currentY);
+    doc.text('3. WORK DETAILS', 10, currentY);
     doc.line(10, currentY + 2, 200, currentY + 2);
+    
     doc.setFontSize(10);
+    doc.text('Job Description:', 10, currentY + 10);
     doc.setFont('helvetica', 'normal');
-    doc.text(report.action_taken || 'No action recorded.', 10, currentY + 8, { maxWidth: 190 });
+    doc.text(report.job_description || 'No description provided.', 15, currentY + 16, { maxWidth: 85 });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Actions Taken:', 105, currentY + 10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(report.action_taken || 'No action recorded.', 110, currentY + 16, { maxWidth: 85 });
+    
+    currentY = Math.max(currentY + 20 + descHeight, currentY + 20 + actionHeight, currentY + 40);
 
-    // Parts
+    // Parts Section
     if (report.field_service_report_parts?.length > 0) {
-      currentY += 30;
-      doc.setFontSize(12);
+      if (currentY > 230) { doc.addPage(); currentY = 20; }
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('PARTS USED', 10, currentY);
+      doc.text('4. REPLACEMENT PARTS', 10, currentY);
       doc.line(10, currentY + 2, 200, currentY + 2);
       
       const partsData = report.field_service_report_parts.map((p: any) => [
         p.part_description,
         p.quantity_used,
-        p.remark
+        p.remark || '-'
       ]);
       
       autoTable(doc, {
         startY: currentY + 5,
-        head: [['Description', 'Qty', 'Remark']],
+        head: [['Part Description', 'Quantity', 'Remarks']],
         body: partsData,
         theme: 'grid',
-        headStyles: { fillColor: [249, 115, 22] }
+        headStyles: { fillColor: primaryColor },
+        bodyStyles: { fontSize: 9 }
       });
+      currentY = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // Signatures
-    currentY = (doc as any).lastAutoTable?.finalY ? Math.max((doc as any).lastAutoTable.finalY + 20, 250) : 250;
-    doc.setFontSize(10);
+    // Signatures / Approvals
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+    if (currentY > 230) { doc.addPage(); currentY = 20; }
+    
+    doc.setFillColor(249, 250, 251);
+    doc.roundedRect(10, currentY, 190, 45, 2, 2, 'F');
+    
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('Signatures:', 10, currentY);
+    doc.text('3. AUTHORIZATION & SIGN-OFF', 15, currentY + 8);
     
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
     doc.setFontSize(8);
-    doc.text('Technician:', 10, currentY + 10);
-    doc.text(report.technician_name || '_________', 35, currentY + 10);
     
-    doc.text('Supervisor:', 80, currentY + 10);
-    doc.text(report.supervisor_name || '_________', 105, currentY + 10);
+    // Tech sign area
+    doc.text('TECHNICIAN SIGNATURE:', 20, currentY + 18);
+    doc.line(20, currentY + 30, 65, currentY + 30);
+    doc.setFont('helvetica', 'bold');
+    doc.text((techNames || 'N/A').toUpperCase(), 20, currentY + 35);
+    doc.setFont('helvetica', 'normal');
     
-    doc.text('Manager:', 150, currentY + 10);
-    doc.text(report.manager_name || '_________', 170, currentY + 10);
+    // Supervisor sign area
+    doc.text('SUPERVISOR APPROVAL:', 80, currentY + 18);
+    doc.line(80, currentY + 30, 125, currentY + 30);
+    doc.setFont('helvetica', 'bold');
+    doc.text((report.supervisor_name || 'PENDING APPROVAL').toUpperCase(), 80, currentY + 35);
+    doc.setFont('helvetica', 'normal');
+    
+    // Manager sign area
+    doc.text('KAMOA HOD / MANAGER:', 140, currentY + 18);
+    doc.line(140, currentY + 30, 185, currentY + 30);
+    doc.setFont('helvetica', 'bold');
+    doc.text((report.manager_name || 'PENDING APPROVAL').toUpperCase(), 140, currentY + 35);
+    
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`FANED MINING SERVICES SARL - Confidential Official Documentation`, 105, 285, { align: 'center' });
+      doc.text(`Kamoa Copper Projects - Field Service Management System`, 105, 290, { align: 'center' });
+      doc.text(`Page ${i} of ${pageCount}`, 195, 290, { align: 'right' });
+    }
 
     doc.save(`FSR_${report.id.substring(0, 8)}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -342,7 +420,7 @@ export default function FieldServiceReports() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer group"
                 onClick={() => setSelectedReport(report)}
               >
                 <div className="p-6 space-y-4">
@@ -381,7 +459,23 @@ export default function FieldServiceReports() {
                     </div>
                     <div className="flex items-center space-x-2 text-gray-500">
                       <User className="w-4 h-4" />
-                      <span className="text-xs font-medium truncate">{report.technician_name}</span>
+                      <div className="flex -space-x-1 overflow-hidden">
+                        {report.field_service_report_technicians?.length > 0 ? (
+                          report.field_service_report_technicians.map((rt: any, i: number) => (
+                            <div 
+                              key={i} 
+                              className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-100 flex items-center justify-center"
+                              title={rt.technicians?.name}
+                            >
+                              <span className="text-[10px] font-medium text-gray-600">
+                                {rt.technicians?.name?.split(' ').map((n: any) => n[0]).join('')}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-xs font-medium truncate">{report.technician_name}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -524,7 +618,10 @@ export default function FieldServiceReports() {
                   </button>
                 )}
                 <button 
-                  onClick={() => window.print()} 
+                  onClick={() => {
+                    window.focus();
+                    window.print();
+                  }} 
                   className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
                   title="Print Report"
                 >
@@ -732,8 +829,13 @@ export default function FieldServiceReports() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 border-t border-gray-100">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Technician</span>
-                  <p className="text-sm font-bold text-gray-900">{selectedReport.technician_name}</p>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Technicians</span>
+                  <p className="text-sm font-bold text-gray-900">
+                    {selectedReport.field_service_report_technicians?.length > 0
+                      ? selectedReport.field_service_report_technicians.map((rt: any) => rt.technicians?.name).join(', ')
+                      : selectedReport.technician_name
+                    }
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Supervisor</span>
