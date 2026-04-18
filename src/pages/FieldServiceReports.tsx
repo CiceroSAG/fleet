@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFieldServiceReports, getAssignedMaintenanceSchedules, getTechnicians, deleteFieldServiceReport } from '../lib/api';
-import { Plus, Search, FileText, Calendar, Building2, User, ChevronRight, Filter, X, ClipboardList, Truck, Clock, AlertCircle, Printer, Edit, Trash2 } from 'lucide-react';
+import { getFieldServiceReports, getAssignedMaintenanceSchedules, getTechnicians, deleteFieldServiceReport, getSettings } from '../lib/api';
+import { Plus, Search, FileText, Calendar, Building2, User, ChevronRight, Filter, X, ClipboardList, Truck, Clock, AlertCircle, Printer, Edit, Trash2, CheckCircle2, Wrench, ShieldCheck, Download } from 'lucide-react';
 import FieldServiceReportForm from '../components/FieldServiceReportForm';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function FieldServiceReports() {
   const { profile, session } = useAuth();
@@ -27,6 +29,11 @@ export default function FieldServiceReports() {
     queryFn: getTechnicians,
   });
 
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings
+  });
+
   const { data: assignedTasks } = useQuery({ 
     queryKey: ['assignedTasks', session?.user?.id], 
     queryFn: () => getAssignedMaintenanceSchedules(session?.user?.id || ''),
@@ -46,6 +53,170 @@ export default function FieldServiceReports() {
     if (selectedReport) {
       deleteMutation.mutate(selectedReport.id);
     }
+  };
+
+  const downloadSingleReportPDF = async (report: any) => {
+    const doc = new jsPDF();
+    const brandName = settings?.company_name || 'Fleet Management System';
+    
+    // Header
+    doc.setFillColor(249, 115, 22); // Orange-500
+    doc.rect(0, 0, 210, 30, 'F');
+    
+    // Add Logo if exists
+    if (settings?.logo_url) {
+      try {
+        const img = new Image();
+        img.src = settings.logo_url;
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        // Calculate dimensions to fit in header (max height 20mm)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        const imgData = canvas.toDataURL('image/png');
+        
+        doc.addImage(imgData, 'PNG', 10, 5, 20, 20); // Pos: 10,5, Size: 20x20
+      } catch (error) {
+        console.error('Error adding logo to PDF:', error);
+      }
+    }
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(brandName.toUpperCase(), settings?.logo_url ? 35 : 105, 17, { align: settings?.logo_url ? 'left' : 'center' });
+    doc.setFontSize(10);
+    doc.text('FIELD SERVICE REPORT', settings?.logo_url ? 35 : 105, 24, { align: settings?.logo_url ? 'left' : 'center' });
+    
+    // Meta Info
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Report ID: ${report.id.substring(0, 8)}`, 10, 40);
+    doc.text(`Date: ${new Date(report.report_date).toLocaleDateString()}`, 10, 46);
+    doc.text(`Technician: ${report.technician_name}`, 10, 52);
+    doc.text(`Workplace: ${report.workplace}`, 10, 58);
+    doc.text(`Status: ${(report.status || 'Pending').toUpperCase()}`, 10, 64);
+    
+    // Checklists
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CHECKLISTS & DETAILS', 10, 75);
+    
+    const checklistData = [
+      ['MAINTENANCE', report.maintenance_details ? Object.entries(report.maintenance_details)
+        .filter(([_, v]) => v)
+        .map(([k, _]) => k.replace(/_/g, ' ').toUpperCase())
+        .join(', ') || 'NONE' : 'NONE'],
+      ['REPAIRS', report.repair_details ? Object.entries(report.repair_details)
+        .filter(([_, v]) => v)
+        .map(([k, _]) => k.replace(/_/g, ' ').toUpperCase())
+        .join(', ') || 'NONE' : 'NONE'],
+      ['SAFETY & INCIDENTS', report.safety_details?.incident_type !== 'none' 
+        ? `${report.safety_details.incident_type.replace(/_/g, ' ').toUpperCase()} (SEVERITY: ${report.safety_details.severity.toUpperCase()})` 
+        : 'NONE']
+    ];
+
+    autoTable(doc, {
+      startY: 78,
+      head: [['Category', 'Details']],
+      body: checklistData,
+      theme: 'grid',
+      headStyles: { fillColor: [50, 50, 50] },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 50 },
+        1: { cellWidth: 'auto' }
+      }
+    });
+
+    // Equipment
+    let currentY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EQUIPMENT INVOLVED', 10, currentY);
+    doc.line(10, currentY + 2, 200, currentY + 2);
+    
+    const equipmentData = report.field_service_report_assets?.map((a: any) => [
+      a.equipment?.asset_tag,
+      a.equipment?.model,
+      a.index_value,
+      a.next_service_date ? new Date(a.next_service_date).toLocaleDateString() : 'N/A'
+    ]) || [];
+    
+    autoTable(doc, {
+      startY: currentY + 5,
+      head: [['Asset Tag', 'Model', 'Index', 'Next Service']],
+      body: equipmentData,
+      theme: 'grid',
+      headStyles: { fillColor: [249, 115, 22] }
+    });
+    
+    // Description
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('JOB DESCRIPTION', 10, currentY);
+    doc.line(10, currentY + 2, 200, currentY + 2);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(report.job_description || 'No description provided.', 10, currentY + 8, { maxWidth: 190 });
+    
+    // Action Taken
+    currentY += 30; // Approximation, better to calculate height
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ACTION TAKEN', 10, currentY);
+    doc.line(10, currentY + 2, 200, currentY + 2);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(report.action_taken || 'No action recorded.', 10, currentY + 8, { maxWidth: 190 });
+
+    // Parts
+    if (report.field_service_report_parts?.length > 0) {
+      currentY += 30;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PARTS USED', 10, currentY);
+      doc.line(10, currentY + 2, 200, currentY + 2);
+      
+      const partsData = report.field_service_report_parts.map((p: any) => [
+        p.part_description,
+        p.quantity_used,
+        p.remark
+      ]);
+      
+      autoTable(doc, {
+        startY: currentY + 5,
+        head: [['Description', 'Qty', 'Remark']],
+        body: partsData,
+        theme: 'grid',
+        headStyles: { fillColor: [249, 115, 22] }
+      });
+    }
+
+    // Signatures
+    currentY = (doc as any).lastAutoTable?.finalY ? Math.max((doc as any).lastAutoTable.finalY + 20, 250) : 250;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Signatures:', 10, currentY);
+    
+    doc.setFontSize(8);
+    doc.text('Technician:', 10, currentY + 10);
+    doc.text(report.technician_name || '_________', 35, currentY + 10);
+    
+    doc.text('Supervisor:', 80, currentY + 10);
+    doc.text(report.supervisor_name || '_________', 105, currentY + 10);
+    
+    doc.text('Manager:', 150, currentY + 10);
+    doc.text(report.manager_name || '_________', 170, currentY + 10);
+
+    doc.save(`FSR_${report.id.substring(0, 8)}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const filteredReports = reports?.filter(report => {
@@ -262,6 +433,23 @@ export default function FieldServiceReports() {
             technician_id: editingReport.technician_id,
             report_date: editingReport.report_date,
             status: editingReport.status,
+            maintenance_details: editingReport.maintenance_details || {
+              inspection: false,
+              oil_change: false,
+              greasing: false,
+              other: false,
+            },
+            repair_details: editingReport.repair_details || {
+              mechanical: false,
+              electrical: false,
+              hydraulic: false,
+              body_work: false,
+              tires: false,
+            },
+            safety_details: editingReport.safety_details || {
+              incident_type: 'none',
+              severity: 'Minor',
+            },
             assets: editingReport.field_service_report_assets?.map((a: any) => ({
               equipment_id: a.equipment_id,
               index_value: a.index_value,
@@ -277,6 +465,23 @@ export default function FieldServiceReports() {
             job_type: selectedSchedule.maintenance_type === 'preventive' ? 'PM' : 
                       selectedSchedule.maintenance_type === 'corrective' ? 'RP' : 'BD',
             job_description: selectedSchedule.description,
+            maintenance_details: {
+              inspection: selectedSchedule.maintenance_type === 'preventive',
+              oil_change: false,
+              greasing: false,
+              other: false,
+            },
+            repair_details: {
+              mechanical: selectedSchedule.maintenance_type === 'corrective',
+              electrical: false,
+              hydraulic: false,
+              body_work: false,
+              tires: false,
+            },
+            safety_details: {
+              incident_type: 'none',
+              severity: 'Minor',
+            },
             assets: [{
               equipment_id: selectedSchedule.equipment_id,
               index_value: 0,
@@ -325,12 +530,43 @@ export default function FieldServiceReports() {
                 >
                   <Printer className="w-5 h-5" />
                 </button>
+                <button 
+                  onClick={() => downloadSingleReportPDF(selectedReport)} 
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors text-orange-600"
+                  title="Download PDF"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
                 <button onClick={() => setSelectedReport(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
             </div>
             <div id="printable-report" className="flex-1 overflow-y-auto p-8 space-y-8">
+              {/* Header only for print */}
+              <div className="hidden print:block border-b-2 border-orange-600 pb-6 mb-8">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    {settings?.logo_url && (
+                      <img 
+                        src={settings.logo_url} 
+                        alt="Logo" 
+                        className="w-16 h-16 object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                    <div>
+                      <h1 className="text-3xl font-black text-orange-600 tracking-tighter">{settings?.company_name || 'Fleet Management System'}</h1>
+                      <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mt-1">Field Service Report</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-900">Report ID: {selectedReport.id.substring(0, 8)}</p>
+                    <p className="text-xs text-gray-500">{new Date().toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Workplace</span>
@@ -363,6 +599,82 @@ export default function FieldServiceReports() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-bold text-gray-900 border-b border-gray-100 pb-2">Checklists & Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Maintenance Checklist View */}
+                  <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                    <h5 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Maintenance
+                    </h5>
+                    <div className="space-y-2">
+                      {selectedReport.maintenance_details && Object.entries(selectedReport.maintenance_details).map(([key, value]) => (
+                        value && (
+                          <div key={key} className="flex items-center gap-2 text-blue-800 text-xs font-medium">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                            <span className="capitalize">{key.replace('_', ' ')}</span>
+                          </div>
+                        )
+                      ))}
+                      {(!selectedReport.maintenance_details || !Object.values(selectedReport.maintenance_details).some(v => v)) && (
+                        <p className="text-gray-400 text-[10px] italic">No maintenance items checked</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Repair Checklist View */}
+                  <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-100">
+                    <h5 className="text-[10px] font-bold text-orange-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <Wrench className="w-3 h-3" />
+                      Repairs
+                    </h5>
+                    <div className="space-y-2">
+                      {selectedReport.repair_details && Object.entries(selectedReport.repair_details).map(([key, value]) => (
+                        value && (
+                          <div key={key} className="flex items-center gap-2 text-orange-800 text-xs font-medium">
+                            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                            <span className="capitalize">{key.replace('_', ' ')}</span>
+                          </div>
+                        )
+                      ))}
+                      {(!selectedReport.repair_details || !Object.values(selectedReport.repair_details).some(v => v)) && (
+                        <p className="text-gray-400 text-[10px] italic">No repair items checked</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Safety View */}
+                  <div className="p-4 bg-red-50/50 rounded-xl border border-red-100">
+                    <h5 className="text-[10px] font-bold text-red-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <ShieldCheck className="w-3 h-3" />
+                      Safety
+                    </h5>
+                    <div className="space-y-2">
+                      {selectedReport.safety_details?.incident_type && selectedReport.safety_details.incident_type !== 'none' ? (
+                        <div className="space-y-2">
+                          <div className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase">
+                            {selectedReport.safety_details.incident_type.replace('_', ' ')}
+                          </div>
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-gray-500 font-bold uppercase tracking-tighter">Severity:</span>
+                            <span className={`font-bold uppercase ${
+                              selectedReport.safety_details.severity === 'Critical' ? 'text-red-600' :
+                              selectedReport.safety_details.severity === 'Major' ? 'text-orange-600' :
+                              'text-blue-600'
+                            }`}>
+                              {selectedReport.safety_details.severity}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-[10px] italic">No incidents reported</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4">

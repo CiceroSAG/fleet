@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getEquipment, getFuelLogs, getMaintenanceLogs, getIncidents, getOperators, getSettings } from '../lib/api';
+import { getEquipment, getFuelLogs, getMaintenanceLogs, getIncidents, getOperators, getSettings, getFieldServiceReports } from '../lib/api';
 import { FileText, Download, PieChart, BarChart3, TrendingUp, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -18,6 +18,7 @@ export default function Reports() {
   const { data: incidents } = useQuery({ queryKey: ['incidents'], queryFn: getIncidents });
   const { data: operators } = useQuery({ queryKey: ['operators'], queryFn: getOperators });
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings });
+  const { data: reports } = useQuery({ queryKey: ['fieldServiceReports'], queryFn: getFieldServiceReports });
 
   const currencySymbol = getCurrencySymbol(settings?.currency);
 
@@ -145,6 +146,28 @@ export default function Reports() {
         inc.severity,
         inc.description
       ]) || [];
+    } else if (reportType === 'Field Service Reports') {
+      columns = ['Date', 'Technician', 'Workplace', 'Type', 'Status', 'Checklists'];
+      tableData = reports?.map(report => {
+        const checks = [];
+        if (report.maintenance_details) {
+          Object.entries(report.maintenance_details).forEach(([k, v]) => v && checks.push(`M:${k}`));
+        }
+        if (report.repair_details) {
+          Object.entries(report.repair_details).forEach(([k, v]) => v && checks.push(`R:${k}`));
+        }
+        if (report.safety_details?.incident_type && report.safety_details.incident_type !== 'none') {
+          checks.push(`S:${report.safety_details.incident_type}`);
+        }
+        return [
+          new Date(report.report_date).toLocaleDateString(),
+          report.technician_name,
+          report.workplace,
+          report.job_type,
+          report.status,
+          checks.join(', ')
+        ];
+      }) || [];
     }
 
     autoTable(doc, {
@@ -189,6 +212,19 @@ export default function Reports() {
         Severity: inc.severity,
         Description: inc.description
       })) || [];
+    } else if (reportType === 'Field Service Reports') {
+      data = reports?.map(report => ({
+        Date: new Date(report.report_date).toLocaleDateString(),
+        Technician: report.technician_name,
+        Workplace: report.workplace,
+        Type: report.job_type,
+        Status: report.status,
+        Description: report.job_description,
+        Action: report.action_taken,
+        Maintenance: JSON.stringify(report.maintenance_details),
+        Repair: JSON.stringify(report.repair_details),
+        Safety: JSON.stringify(report.safety_details)
+      })) || [];
     }
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -199,6 +235,7 @@ export default function Reports() {
 
   const reportTypes = [
     { title: 'Fleet Utilization', description: 'Detailed analysis of equipment usage and idle time.', icon: PieChart, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+    { title: 'Field Service Reports', description: 'Technician on-site reports and maintenance checklists.', icon: FileText, color: 'text-purple-600', bgColor: 'bg-purple-50' },
     { title: 'Fuel Consumption', description: 'Fuel efficiency and cost analysis across the fleet.', icon: TrendingUp, color: 'text-green-600', bgColor: 'bg-green-50' },
     { title: 'Maintenance Summary', description: 'Overview of completed and pending service tasks.', icon: BarChart3, color: 'text-orange-600', bgColor: 'bg-orange-50' },
     { title: 'Safety & Incidents', description: 'Incident reports and safety compliance metrics.', icon: AlertCircle, color: 'text-red-600', bgColor: 'bg-red-50' },
