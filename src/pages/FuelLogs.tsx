@@ -132,7 +132,7 @@ export default function FuelLogs() {
             <TrendingUp className="h-8 w-8 text-green-600" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Fuel</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalQuantity.toFixed(1)} L</p>
+              <p className="text-2xl font-bold text-gray-900">{(stats.totalQuantity || 0).toFixed(1)} L</p>
             </div>
           </div>
         </div>
@@ -142,7 +142,7 @@ export default function FuelLogs() {
             <DollarSign className="h-8 w-8 text-orange-600" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Cost</p>
-              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{stats.totalCost.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{(stats.totalCost || 0).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function FuelLogs() {
             <Calendar className="h-8 w-8 text-purple-600" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Avg Price/L</p>
-              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{stats.avgPrice.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900">{currencySymbol}{(stats.avgPrice || 0).toFixed(2)}</p>
             </div>
           </div>
         </div>

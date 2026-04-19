@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 type Profile = {
   id: string;
   email: string;
+  full_name?: string;
   role: 'Admin' | 'Manager' | 'Operator' | 'Technician';
 };
 
@@ -106,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .insert({
                 id: userId,
                 email: user.user.email,
+                full_name: user.user.user_metadata?.full_name || user.user.email?.split('@')[0],
                 role: 'Operator'
               })
               .select()

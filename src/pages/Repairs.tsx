@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getRepairLogs, getEquipment, deleteRepairLog } from '../lib/api';
+import { getRepairLogs, getEquipment, deleteRepairLog, getSettings } from '../lib/api';
 import { Plus, Search, AlertCircle, Wrench, Clock, CheckCircle2, MoreVertical, Trash2, Edit2, Calendar } from 'lucide-react';
 import RepairLogForm from '../components/RepairLogForm';
 import ConfirmModal from '../components/ConfirmModal';
+import { getCurrencySymbol } from '../lib/utils';
 
 export default function Repairs() {
   const queryClient = useQueryClient();
@@ -22,6 +23,13 @@ export default function Repairs() {
     queryKey: ['equipment'],
     queryFn: getEquipment,
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings
+  });
+
+  const currencySymbol = getCurrencySymbol(settings?.currency);
 
   const deleteMutation = useMutation({
     mutationFn: deleteRepairLog,
@@ -123,7 +131,7 @@ export default function Repairs() {
                       {new Date(log.date_reported).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      ${log.cost?.toLocaleString() || '0'}
+                      {currencySymbol}{log.cost?.toLocaleString() || '0'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex -space-x-1">

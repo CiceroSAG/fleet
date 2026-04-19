@@ -29,6 +29,8 @@ import PartsInventory from './pages/PartsInventory';
 import UserManagement from './pages/UserManagement';
 import Technicians from './pages/Technicians';
 import FieldServiceReports from './pages/FieldServiceReports';
+import Inspections from './pages/Inspections';
+import Workshop from './pages/Workshop';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +87,8 @@ export default function App() {
               <Route path="users" element={<UserManagement />} />
               <Route path="technicians" element={<Technicians />} />
               <Route path="field-service-reports" element={<FieldServiceReports />} />
+              <Route path="inspections" element={<Inspections />} />
+              <Route path="workshop" element={<Workshop />} />
             </Route>
           </Routes>
         </BrowserRouter>

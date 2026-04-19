@@ -17,7 +17,9 @@ export async function getSettings() {
     reports: true,
     user_management: true,
     technicians: true,
-    field_service_reports: true
+    field_service_reports: true,
+    inspections: true,
+    ai_forecasting: true
   };
 
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
@@ -688,6 +690,108 @@ export async function deleteTechnician(id: string) {
     return;
   }
   const { error } = await supabase.from('technicians').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// --- Workshop Bays ---
+let mockBaysData = [
+  { id: 'b1', name: 'Bay 1', status: 'available', description: 'Heavy Vehicle Bay' },
+  { id: 'b2', name: 'Bay 2', status: 'occupied', description: 'Light Vehicle Bay' },
+  { id: 'b3', name: 'Bay 3', status: 'maintenance', description: 'Tire Service Bay' }
+];
+
+export async function createWorkshopBay(bay: any) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    const newBay = { id: Math.random().toString(36).substring(7), ...bay, created_at: new Date().toISOString() };
+    mockBaysData.push(newBay);
+    return newBay;
+  }
+  const { data, error } = await supabase
+    .from('workshop_bays')
+    .insert([bay])
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function deleteWorkshopBay(id: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockBaysData = mockBaysData.filter(b => b.id !== id);
+    return;
+  }
+  const { error } = await supabase
+    .from('workshop_bays')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function getWorkshopBays() {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [...mockBaysData];
+  }
+  const { data, error } = await supabase
+    .from('workshop_bays')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data;
+}
+
+export async function updateWorkshopBay(id: string, bay: any) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    const index = mockBaysData.findIndex(b => b.id === id);
+    if (index !== -1) mockBaysData[index] = { ...mockBaysData[index], ...bay };
+    return mockBaysData[index];
+  }
+  const { data, error } = await supabase
+    .from('workshop_bays')
+    .update(bay)
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+// --- Equipment Documents ---
+let mockDocsData: any[] = [];
+
+export async function getEquipmentDocuments(equipmentId: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return mockDocsData.filter(d => d.equipment_id === equipmentId);
+  }
+  const { data, error } = await supabase
+    .from('equipment_documents')
+    .select('*')
+    .eq('equipment_id', equipmentId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function createEquipmentDocument(doc: any) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    const newDoc = { id: Math.random().toString(36).substring(7), ...doc, created_at: new Date().toISOString() };
+    mockDocsData.push(newDoc);
+    return newDoc;
+  }
+  const { data, error } = await supabase
+    .from('equipment_documents')
+    .insert([doc])
+    .select();
+  if (error) throw error;
+  return data[0];
+}
+
+export async function deleteEquipmentDocument(id: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockDocsData = mockDocsData.filter(d => d.id !== id);
+    return;
+  }
+  const { error } = await supabase
+    .from('equipment_documents')
+    .delete()
+    .eq('id', id);
   if (error) throw error;
 }
 
@@ -1397,7 +1501,7 @@ export async function deleteDVIRReport(id: string) {
 
 // Maintenance Schedules
 let mockMaintenanceSchedulesData = [
-  { id: 's1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', service_type: 'Oil Change', maintenance_type: 'preventive', description: 'Regular oil change', frequency_days: 90, last_completed: new Date().toISOString(), next_due: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), status: 'scheduled', assigned_to: 'mock-user-id', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' }, profiles: { email: 'admin@example.com' } }
+  { id: 's1111111-1111-1111-1111-111111111111', equipment_id: '11111111-1111-1111-1111-111111111111', service_type: 'Oil Change', maintenance_type: 'preventive', description: 'Regular oil change', frequency_days: 90, last_completed: new Date().toISOString(), next_due: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), status: 'scheduled', assigned_to: 'mock-user-id', equipment: { asset_tag: 'TRK-001', type: 'Dump Truck' }, profiles: { email: 'admin@example.com', full_name: 'Demo Admin' } }
 ];
 
 export async function getAssignedMaintenanceSchedules(userId: string) {
@@ -1415,7 +1519,8 @@ export async function getAssignedMaintenanceSchedules(userId: string) {
         serial_number
       ),
       profiles:assigned_to (
-        email
+        email,
+        full_name
       )
     `)
     .eq('assigned_to', userId)
@@ -1439,7 +1544,8 @@ export async function getMaintenanceSchedules() {
         type
       ),
       profiles:assigned_to (
-        email
+        email,
+        full_name
       ),
       maintenance_logs (id, date, status),
       repair_logs (id, date_reported, status),
@@ -1457,7 +1563,8 @@ export async function getMaintenanceSchedulesByEquipment(equipmentId: string) {
     .select(`
       *,
       profiles:assigned_to (
-        email
+        email,
+        full_name
       )
     `)
     .eq('equipment_id', equipmentId)
@@ -2298,6 +2405,56 @@ export async function deleteNotification(id: string) {
   if (error) throw error;
 }
 
+// --- Inspections (DVIR) ---
+let mockInspectionChecklistsData = [
+  { id: 'c1', name: 'Pre-Trip Inspection', category: 'General', items: [
+    { id: '1', label: 'Engine Oil', type: 'status' },
+    { id: '2', label: 'Brake Fluid', type: 'status' },
+    { id: '3', label: 'Tire Pressure', type: 'status' },
+    { id: '4', label: 'Lights & Indicators', type: 'status' },
+    { id: '5', label: 'General Damage', type: 'status' }
+  ] }
+];
+
+export async function getInspectionChecklists() {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [...mockInspectionChecklistsData];
+  }
+  const { data, error } = await supabase.from('inspection_checklists').select('*');
+  if (error) throw error;
+  return data;
+}
+
+let mockInspectionsData: any[] = [];
+
+export async function getInspections() {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [...mockInspectionsData];
+  }
+  const { data, error } = await supabase
+    .from('inspections')
+    .select(`
+      *,
+      equipment (asset_tag, model),
+      profiles (email, full_name),
+      inspection_checklists (name)
+    `)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function createInspection(inspection: any) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    const newInspection = { id: Math.random().toString(36).substring(7), created_at: new Date().toISOString(), ...inspection };
+    mockInspectionsData.unshift(newInspection);
+    return newInspection;
+  }
+  const { data, error } = await supabase.from('inspections').insert([inspection]).select().single();
+  if (error) throw error;
+  return data;
+}
+
 // Get admin and manager profiles for notifications
 export async function getAdminProfiles() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
@@ -2809,7 +2966,8 @@ export async function getMaintenanceWorkload() {
         type
       ),
       profiles:assigned_to (
-        email
+        email,
+        full_name
       )
     `)
     .eq('status', 'active');

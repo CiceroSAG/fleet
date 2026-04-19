@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getMaintenanceSchedulesWithUnderMaintenance, getMaintenanceWorkload, autoAssignMaintenance, checkPartsAvailability, getMaintenanceOptimization, getSettings } from '@/lib/api';
 import { Wrench, Calendar, AlertTriangle, CheckCircle, User, Package, Zap, Plus, Edit2, ClipboardList } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import MaintenanceScheduleForm from '@/components/MaintenanceScheduleForm';
@@ -28,6 +29,7 @@ interface MaintenanceSchedule {
   };
   profiles?: {
     email: string;
+    full_name?: string;
   };
   maintenance_logs?: any[];
   repair_logs?: any[];
@@ -42,7 +44,7 @@ export default function MaintenanceScheduling() {
     priority: 'all',
     type: 'all'
   });
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(new URLSearchParams(window.location.search).get('action') === 'new');
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const [completingSchedule, setCompletingSchedule] = useState<any>(null);
 
@@ -332,7 +334,9 @@ export default function MaintenanceScheduling() {
             {workload.map((tech: any) => (
               <div key={tech.profile.id} className="p-4 border rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-gray-900">{tech.profile.email}</h3>
+                  <h3 className="font-medium text-gray-900">
+                    {tech.profile.full_name || tech.profile.email}
+                  </h3>
                   <span className="text-sm text-gray-500">{tech.assignedTasks} tasks</span>
                 </div>
                 <div className="space-y-1">
@@ -448,7 +452,9 @@ export default function MaintenanceScheduling() {
                           </div>
                           <div>
                             <span className="font-medium">Assigned:</span>
-                            <span className="ml-1">{schedule.profiles?.email || 'Unassigned'}</span>
+                            <span className="ml-1">
+                              {schedule.profiles?.full_name || schedule.profiles?.email || 'Unassigned'}
+                            </span>
                           </div>
                           <div>
                             <span className="font-medium">Est. Cost:</span>
@@ -546,34 +552,38 @@ export default function MaintenanceScheduling() {
           </div>
         </div>
       </div>
-      {isFormOpen && (
-        <MaintenanceScheduleForm
-          schedule={selectedSchedule}
-          onClose={() => {
-            setIsFormOpen(false);
-            setSelectedSchedule(null);
-          }}
-        />
-      )}
-      {completingSchedule && (
-        completingSchedule.maintenance_type === 'corrective' || completingSchedule.notes === 'Equipment requires repair' ? (
-          <RepairLogForm
-            schedule={completingSchedule}
+      <AnimatePresence>
+        {isFormOpen && (
+          <MaintenanceScheduleForm
+            schedule={selectedSchedule}
             onClose={() => {
-              setCompletingSchedule(null);
-              fetchMaintenanceSchedules();
+              setIsFormOpen(false);
+              setSelectedSchedule(null);
             }}
           />
-        ) : (
-          <MaintenanceForm
-            schedule={completingSchedule}
-            onClose={() => {
-              setCompletingSchedule(null);
-              fetchMaintenanceSchedules();
-            }}
-          />
-        )
-      )}
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {completingSchedule && (
+          completingSchedule.maintenance_type === 'corrective' || completingSchedule.notes === 'Equipment requires repair' ? (
+            <RepairLogForm
+              schedule={completingSchedule}
+              onClose={() => {
+                setCompletingSchedule(null);
+                fetchMaintenanceSchedules();
+              }}
+            />
+          ) : (
+            <MaintenanceForm
+              schedule={completingSchedule}
+              onClose={() => {
+                setCompletingSchedule(null);
+                fetchMaintenanceSchedules();
+              }}
+            />
+          )
+        )}
+      </AnimatePresence>
     </div>
   );
 }

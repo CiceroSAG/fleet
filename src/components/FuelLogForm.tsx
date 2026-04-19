@@ -5,6 +5,7 @@ import * as z from 'zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createFuelLog, updateFuelLog, getEquipment, getSettings, calculateFuelEfficiencyFromFuelLog } from '@/lib/api';
 import { X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { getCurrencySymbol } from '@/lib/utils';
 
 const fuelLogSchema = z.object({
@@ -87,15 +88,27 @@ export default function FuelLogForm({ log, initialData, onClose }: FuelLogFormPr
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative w-full max-w-md rounded-lg bg-white shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b p-4">
-          <h3 className="text-xl font-semibold text-gray-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        <div className="flex items-center justify-between border-b p-4 bg-gray-50/50">
+          <h3 className="text-xl font-bold text-gray-900">
             {log ? 'Edit Fuel Log' : 'Add Fuel Log'}
           </h3>
           <button
             onClick={onClose}
-            className="ml-auto inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-gray-400 hover:bg-gray-200 hover:text-gray-900"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
           >
             <X className="h-5 w-5" />
           </button>
@@ -182,7 +195,7 @@ export default function FuelLogForm({ log, initialData, onClose }: FuelLogFormPr
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

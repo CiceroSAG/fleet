@@ -258,7 +258,7 @@ export default function RealTimeTracking() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm text-gray-600">
-                      {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                      {(location.latitude || 0).toFixed(6)}, {(location.longitude || 0).toFixed(6)}
                     </div>
                   </div>
                 </div>
@@ -277,7 +277,7 @@ export default function RealTimeTracking() {
                       <div>
                         <span className="text-gray-500">Location:</span>
                         <span className="ml-1 font-medium">
-                          {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                          {(location.latitude || 0).toFixed(4)}, {(location.longitude || 0).toFixed(4)}
                         </span>
                       </div>
                       <div>

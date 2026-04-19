@@ -1,5 +1,5 @@
 {
-  "name": "MineFleet",
-  "description": "Fleet Management System for Mining Equipment",
-  "requestFramePermissions": []
+  "name": "Fanned Fleet Management",
+  "description": "Logistics & Fleet Management System with AI maintenance, NFC/QR tagging, digital document vault, and workshop management.",
+  "requestFramePermissions": ["camera"]
 }

@@ -10,7 +10,7 @@ import autoTable from 'jspdf-autotable';
 
 export default function FieldServiceReports() {
   const { profile, session } = useAuth();
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(new URLSearchParams(window.location.search).get('action') === 'new');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);

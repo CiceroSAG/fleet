@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEquipment, getProfiles, createMaintenanceSchedule, updateMaintenanceSchedule } from '../lib/api';
 import { X, Save, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface MaintenanceScheduleFormProps {
   schedule?: any;
@@ -100,15 +101,27 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
         <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-xl font-bold text-gray-900">
             {schedule ? 'Edit Maintenance Schedule' : 'Add Maintenance Schedule'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all"
           >
             <X className="w-5 h-5" />
           </button>
@@ -270,7 +283,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
                 <option value="">Unassigned</option>
                 {profiles?.filter((p: any) => ['Admin', 'Manager', 'Technician'].includes(p.role)).map((profile: any) => (
                   <option key={profile.id} value={profile.id}>
-                    {profile.email} ({profile.role})
+                    {profile.full_name || profile.email} ({profile.role})
                   </option>
                 ))}
               </select>
@@ -352,7 +365,7 @@ export default function MaintenanceScheduleForm({ schedule, onClose }: Maintenan
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -1,12 +1,30 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTechnicians, createTechnician, updateTechnician, deleteTechnician, getProfiles, getFieldServiceReports } from '../lib/api';
-import { Plus, Search, User, Mail, Briefcase, CheckCircle2, XCircle, MoreVertical, Edit2, Trash2, X, Link as LinkIcon, FileText } from 'lucide-react';
+import { Plus, Search, User, Mail, Briefcase, CheckCircle2, XCircle, MoreVertical, Edit2, Trash2, X, Link as LinkIcon, FileText, Lock } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import ConfirmModal from '../components/ConfirmModal';
+import { useAuth } from '../lib/auth';
 
 export default function Technicians() {
+  const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  if (profile?.role === 'Technician') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-2xl border border-gray-100 p-8 text-center">
+        <div className="bg-red-50 p-4 rounded-full mb-4">
+          <Lock className="w-12 h-12 text-red-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Access Restricted</h2>
+        <p className="text-gray-500 max-w-md">
+          Technicians are not authorized to view or manage the technician directory. 
+          Please contact your administrator if you believe this is an error.
+        </p>
+      </div>
+    );
+  }
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedTechnician, setSelectedTechnician] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -192,17 +210,30 @@ export default function Technicians() {
       </div>
 
       {/* Form Modal */}
-      {isFormOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900">
-                {selectedTechnician ? 'Edit Technician' : 'Add New Technician'}
-              </h2>
-              <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
+      <AnimatePresence>
+        {isFormOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsFormOpen(false)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {selectedTechnician ? 'Edit Technician' : 'Add New Technician'}
+                </h2>
+                <button onClick={() => setIsFormOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             <form 
               onSubmit={(e) => {
                 e.preventDefault();
@@ -295,9 +326,10 @@ export default function Technicians() {
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
       <ConfirmModal
         isOpen={!!deleteId}
         title="Delete Technician"
