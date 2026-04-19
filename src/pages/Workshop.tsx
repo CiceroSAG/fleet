@@ -16,12 +16,17 @@ export default function WorkshopBays() {
   const [selectedBay, setSelectedBay] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newBay, setNewBay] = useState({ name: '', description: '', status: 'available' });
+  const [error, setError] = useState<string | null>(null);
 
   const bayMutation = useMutation({
     mutationFn: ({ id, bay }: { id: string, bay: any }) => updateWorkshopBay(id, bay),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workshopBays'] });
       setSelectedBay(null);
+    },
+    onError: (err: any) => {
+      console.error('Error updating bay:', err);
+      alert(err.message || 'Error updating workshop bay');
     }
   });
 
@@ -31,6 +36,11 @@ export default function WorkshopBays() {
       queryClient.invalidateQueries({ queryKey: ['workshopBays'] });
       setShowAddModal(false);
       setNewBay({ name: '', description: '', status: 'available' });
+      setError(null);
+    },
+    onError: (err: any) => {
+      console.error('Error creating bay:', err);
+      setError(err.message || 'Error creating workshop bay. Ensure the database table exists.');
     }
   });
 
@@ -39,6 +49,10 @@ export default function WorkshopBays() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workshopBays'] });
       setSelectedBay(null);
+    },
+    onError: (err: any) => {
+      console.error('Error deleting bay:', err);
+      alert(err.message || 'Error deleting workshop bay. It may still have equipment assigned to it.');
     }
   });
 
@@ -252,6 +266,12 @@ export default function WorkshopBays() {
               </div>
 
               <div className="space-y-4">
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-bold flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Bay Name</label>
                   <input
@@ -274,10 +294,10 @@ export default function WorkshopBays() {
                 
                 <button
                   onClick={() => createMutation.mutate(newBay)}
-                  disabled={!newBay.name}
+                  disabled={!newBay.name || createMutation.isPending}
                   className="w-full bg-orange-600 text-white font-black py-4 rounded-xl shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all disabled:opacity-50 disabled:shadow-none"
                 >
-                  Create Workshop Bay
+                  {createMutation.isPending ? 'Creating...' : 'Create Workshop Bay'}
                 </button>
               </div>
             </motion.div>
