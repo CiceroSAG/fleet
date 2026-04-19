@@ -13,31 +13,45 @@ export default function QRScanner({ onScan, onClose, title = 'Scan Asset QR Code
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const scanner = new Html5QrcodeScanner(
-      'qr-reader',
-      { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-      },
-      /* verbose= */ false
-    );
+    let scanner: Html5QrcodeScanner | null = null;
+    
+    const startScanner = () => {
+      scanner = new Html5QrcodeScanner(
+        'qr-reader',
+        { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          showTorchButtonIfSupported: true
+        },
+        /* verbose= */ false
+      );
 
-    scanner.render(
-      (decodedText) => {
-        scanner.clear();
-        onScan(decodedText);
-      },
-      (err) => {
-        // Only log errors that are not just "no code found"
-        if (err && !err.includes('No MultiFormat Readers were able to decode')) {
-          console.warn('QR Code Scan Error:', err);
+      scanner.render(
+        (decodedText) => {
+          if (scanner) {
+            scanner.clear().catch(console.error);
+          }
+          onScan(decodedText);
+        },
+        (err) => {
+          // Only log errors that are not just "no code found"
+          if (err && !err.includes('No MultiFormat Readers were able to decode')) {
+            console.warn('QR Code Scan Error:', err);
+            if (err.includes('NotAllowedError') || err.includes('Permission denied')) {
+              setError('Camera permission denied. Please enable camera access in your browser settings and refresh the page.');
+            }
+          }
         }
-      }
-    );
+      );
+    };
+
+    startScanner();
 
     return () => {
-      scanner.clear().catch(e => console.error('Failed to clear scanner', e));
+      if (scanner) {
+        scanner.clear().catch(e => console.warn('Failed to clear scanner', e));
+      }
     };
   }, [onScan]);
 

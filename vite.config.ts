@@ -23,20 +23,16 @@ export default defineConfig(({ mode }) => {
           orientation: 'portrait',
           icons: [
             {
-              src: 'https://picsum.photos/seed/truck/192/192',
-              sizes: '192x192',
-              type: 'image/png'
+              src: 'icon.svg',
+              sizes: '192x192 512x512',
+              type: 'image/svg+xml',
+              purpose: 'any'
             },
             {
-              src: 'https://picsum.photos/seed/truck/512/512',
-              sizes: '512x512',
-              type: 'image/png'
-            },
-            {
-              src: 'https://picsum.photos/seed/truck/512/512',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any maskable'
+              src: 'icon.svg',
+              sizes: '192x192 512x512',
+              type: 'image/svg+xml',
+              purpose: 'maskable'
             }
           ]
         },

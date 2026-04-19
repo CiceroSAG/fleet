@@ -129,13 +129,18 @@ This manual provides an exhaustive, step-by-step guide for every feature within 
 
 ## 📱 7. Mobile Field Operations
 
-### **The Easy-Access Button (+)**
+### **7.1 The Easy-Access Button (+)**
 *   Click the big orange button at the bottom center of the mobile screen.
 *   **Scan Asset:** Scan a truck tag to get immediate info.
 *   **Quick Log:** Submit Fuel or Repairs without digging through menus.
 
-### **Offline Mode**
+### **7.2 Offline Mode**
 *   The header will show `OFFLINE` if signal is lost. Keep working! Your data will sync automatically when you return to base Wi-Fi.
+
+### **7.3 Troubleshooting Camera Access**
+*   **Permission Prompt:** If the camera doesn't open, ensure you are using a modern browser (Safari on iOS, Chrome on Android).
+*   **Browser Settings:** Go to your browser settings -> Site Settings -> Camera and ensure access is allowed for this domain.
+*   **In-App Browsers:** If you are opening the app from inside WhatsApp or Facebook, the internal browsers often block camera access. Open the app in **Chrome** or **Safari** directly.
 
 ---
 **Technical Version:** 2.3.0  
