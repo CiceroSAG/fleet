@@ -21,19 +21,38 @@ export default function Layout() {
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(
+    window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone
+  );
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+    const handlePrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('beforeinstallprompt', handlePrompt);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeinstallprompt', handlePrompt);
     };
   }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   const { data: settings } = useQuery({
     queryKey: ['settings'],
@@ -132,8 +151,8 @@ export default function Layout() {
               onClick={() => setIsMobileMenuOpen(false)}
               className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
                 isActive 
-                  ? 'bg-orange-50 text-orange-600 font-medium' 
-                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                   ? 'bg-orange-50 text-orange-600 font-medium' 
+                   : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
               }`}
             >
               <item.icon className={`w-5 h-5 ${isActive ? 'text-orange-600' : 'text-gray-500'}`} />
@@ -141,6 +160,15 @@ export default function Layout() {
             </Link>
           );
         })}
+        {deferredPrompt && !isStandalone && (
+          <button
+            onClick={handleInstall}
+            className="flex items-center space-x-3 px-3 py-2 w-full text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-bold text-left"
+          >
+            <PlusCircle className="w-5 h-5" />
+            <span>Install App</span>
+          </button>
+        )}
       </nav>
       <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100 bg-gray-50/50">
         <Languages className="w-4 h-4 text-gray-400" />

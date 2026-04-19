@@ -31,6 +31,7 @@ import Technicians from './pages/Technicians';
 import FieldServiceReports from './pages/FieldServiceReports';
 import Inspections from './pages/Inspections';
 import Workshop from './pages/Workshop';
+import InstallPWA from './components/InstallPWA';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +60,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <InstallPWA />
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
