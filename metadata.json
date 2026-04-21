@@ -1,5 +1,5 @@
 {
   "name": "Faned Fleet Management",
   "description": "Logistics & Fleet Management System with AI maintenance, NFC/QR tagging, digital document vault, and workshop management.",
-  "requestFramePermissions": ["camera"]
+  "requestFramePermissions": ["camera", "microphone"]
 }

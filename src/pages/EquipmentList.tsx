@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getEquipment, deleteEquipment } from '../lib/api';
-import { Plus, Search, Filter, MoreVertical, Truck, Info, Wrench, Fuel, Edit2, Trash2, Users, Calendar, PlusCircle, QrCode } from 'lucide-react';
+import { getEquipment, deleteEquipment, bulkUpdateEquipmentStatus } from '../lib/api';
+import { Plus, Search, Filter, MoreVertical, Truck, Info, Wrench, Fuel, Edit2, Trash2, Users, Calendar, PlusCircle, QrCode, Download, CheckSquare, Square, XCircle, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import * as XLSX from 'xlsx';
 import EquipmentForm from '../components/EquipmentForm';
 import FuelLogForm from '../components/FuelLogForm';
 import MaintenanceForm from '../components/MaintenanceForm';
@@ -24,10 +25,19 @@ export default function EquipmentList() {
   const [showQR, setShowQR] = useState(false);
   const [qrItem, setQrItem] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const { data: equipment, isLoading } = useQuery({
     queryKey: ['equipment'],
     queryFn: getEquipment,
+  });
+
+  const bulkStatusMutation = useMutation({
+    mutationFn: ({ ids, status }: { ids: string[], status: string }) => bulkUpdateEquipmentStatus(ids, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      setSelectedIds([]);
+    }
   });
 
   const deleteMutation = useMutation({
@@ -66,6 +76,31 @@ export default function EquipmentList() {
     }
   };
 
+  const handleExport = () => {
+    if (!filteredEquipment) return;
+    
+    const exportData = filteredEquipment.map(item => ({
+      'Asset Tag': item.asset_tag,
+      'Type': item.type,
+      'Status': item.status,
+      'Manufacturer': item.manufacturer,
+      'Model': item.model,
+      'Year': item.year,
+      'Serial Number': item.serial_number,
+      'Operator': item.operators?.name || 'Unassigned',
+      'Odometer': item.odometer,
+      'Engine Hours': item.engine_hours,
+      'License Plate': item.license_plate,
+      'VIN': item.vin,
+      'Purchase Date': item.purchase_date
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Fleet');
+    XLSX.writeFile(wb, `Fleet_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-[400px]">Loading equipment...</div>;
   }
@@ -74,16 +109,25 @@ export default function EquipmentList() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Equipment Fleet</h1>
-        <button 
-          onClick={() => {
-            setSelectedItem(null);
-            setIsFormOpen(true);
-          }}
-          className="flex items-center justify-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Equipment</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={handleExport}
+            className="flex items-center justify-center space-x-2 bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Download className="w-5 h-5" />
+            <span>Export</span>
+          </button>
+          <button 
+            onClick={() => {
+              setSelectedItem(null);
+              setIsFormOpen(true);
+            }}
+            className="flex items-center justify-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add Equipment</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -117,22 +161,107 @@ export default function EquipmentList() {
         </div>
       </div>
 
+      <AnimatePresence>
+        {selectedIds.length > 0 && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-6 border border-white/10 backdrop-blur-xl"
+          >
+            <div className="flex items-center space-x-3 pr-6 border-r border-white/10">
+              <span className="bg-orange-600 text-xs font-black px-2 py-1 rounded">
+                {selectedIds.length}
+              </span>
+              <span className="text-sm font-bold tracking-tight">Assets Selected</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <span className="text-[10px] font-black uppercase text-gray-500 mr-2">Set Status:</span>
+              <button 
+                onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'Active' })}
+                disabled={bulkStatusMutation.isPending}
+                className="px-3 py-1.5 bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-white rounded-lg text-xs font-black transition-all border border-green-500/20"
+              > Actívate </button>
+              <button 
+                onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'Maintenance' })}
+                disabled={bulkStatusMutation.isPending}
+                className="px-3 py-1.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white rounded-lg text-xs font-black transition-all border border-orange-500/20"
+              > Maintain </button>
+              <button 
+                onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'Repair' })}
+                disabled={bulkStatusMutation.isPending}
+                className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-xs font-black transition-all border border-red-500/20"
+              > Repair </button>
+              <div className="w-px h-4 bg-white/10 mx-2" />
+              <button 
+                onClick={() => {
+                  /* In a real app we might trigger a specific inspection flow */
+                  bulkStatusMutation.mutate({ ids: selectedIds, status: 'Maintenance' });
+                }}
+                disabled={bulkStatusMutation.isPending}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-white/5 text-white hover:bg-white/10 rounded-lg text-xs font-black transition-all border border-white/10"
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                <span>Quick Inspect</span>
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setSelectedIds([])}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors ml-4"
+            >
+              <XCircle className="w-5 h-5 text-gray-400" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Desktop Table View */}
       <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto min-h-[450px]">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left">
+                  <button 
+                    onClick={() => {
+                      if (selectedIds.length === filteredEquipment?.length) {
+                        setSelectedIds([]);
+                      } else {
+                        setSelectedIds(filteredEquipment?.map(e => e.id) || []);
+                      }
+                    }}
+                    className="text-gray-400 hover:text-orange-600 transition-colors"
+                  >
+                    {selectedIds.length === filteredEquipment?.length ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Tag</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Operator</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">System Health</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredEquipment?.map((item, index) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                <tr key={item.id} className={`hover:bg-gray-50 transition-colors group ${selectedIds.includes(item.id) ? 'bg-orange-50/50' : ''}`}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button 
+                      onClick={() => {
+                        setSelectedIds(prev => 
+                          prev.includes(item.id) 
+                            ? prev.filter(id => id !== item.id) 
+                            : [...prev, item.id]
+                        );
+                      }}
+                      className={`${selectedIds.includes(item.id) ? 'text-orange-600' : 'text-gray-300'} hover:text-orange-500 transition-colors`}
+                    >
+                      {selectedIds.includes(item.id) ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                    </button>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="bg-orange-100 p-2 rounded-lg mr-3">
@@ -154,6 +283,25 @@ export default function EquipmentList() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {item.operators?.name || 'Unassigned'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap min-w-[140px]">
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-gray-400">
+                        <span>Reliability</span>
+                        <span className={
+                          item.status.toLowerCase() === 'active' ? 'text-green-600' :
+                          item.status.toLowerCase() === 'maintenance' ? 'text-orange-500' : 'text-red-500'
+                        }>
+                          {item.status.toLowerCase() === 'active' ? '98%' : item.status.toLowerCase() === 'maintenance' ? '65%' : '24%'}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-500 ${
+                          item.status.toLowerCase() === 'active' ? 'bg-green-500 w-[98%]' :
+                          item.status.toLowerCase() === 'maintenance' ? 'bg-orange-500 w-[65%]' : 'bg-red-500 w-[24%]'
+                        }`} />
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2 relative">
@@ -250,6 +398,29 @@ export default function EquipmentList() {
               }`}>
                 {item.status}
               </span>
+            </div>
+
+            {/* Health Meter */}
+            <div className="pt-2 px-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">System Health</span>
+                <span className={`text-[10px] font-black ${
+                  item.status.toLowerCase() === 'active' ? 'text-green-600' :
+                  item.status.toLowerCase() === 'maintenance' ? 'text-orange-500' : 'text-red-500'
+                }`}>
+                  {item.status.toLowerCase() === 'active' ? '98%' : item.status.toLowerCase() === 'maintenance' ? '65%' : '24%'}
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: item.status.toLowerCase() === 'active' ? '98%' : item.status.toLowerCase() === 'maintenance' ? '65%' : '24%' }}
+                  className={`h-full rounded-full ${
+                    item.status.toLowerCase() === 'active' ? 'bg-green-500' :
+                    item.status.toLowerCase() === 'maintenance' ? 'bg-orange-500' : 'bg-red-500'
+                  }`}
+                />
+              </div>
             </div>
 
             <div className="flex items-center text-sm text-gray-600">

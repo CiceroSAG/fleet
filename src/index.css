@@ -1,7 +1,31 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --color-brand: #ea580c;
+  --color-brand-hover: #c2410c;
+}
+
+.dark {
+  --color-bg: #09090b;
+  --color-surface: #18181b;
+  --color-border: #27272a;
+  --color-text: #fafafa;
+  --color-text-muted: #a1a1aa;
+}
+
 @layer base {
   :root {
+    --color-bg: #f9fafb;
+    --color-surface: #ffffff;
+    --color-border: #e5e7eb;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
+    
     --sat: env(safe-area-inset-top);
     --sar: env(safe-area-inset-right);
     --sab: env(safe-area-inset-bottom);
@@ -11,6 +35,9 @@
   body {
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color 0.3s, color 0.3s;
   }
 
   .pb-safe {
@@ -65,3 +92,33 @@
     }
   }
 }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: fit-content;
+  animation: marquee 40s linear infinite;
+}
+
+/* Command Palette Styles */
+[cmdk-root] {
+  display: flex;
+  flex-direction: column;
+}
+
+[cmdk-input] {
+  font-family: inherit;
+}
+
+[cmdk-item] {
+  content-visibility: auto;
+}
+
+[cmdk-group-heading] {
+  user-select: none;
+}
+

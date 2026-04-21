@@ -22,7 +22,7 @@ import RealTimeTracking from './pages/RealTimeTracking';
 import DriverBehavior from './pages/DriverBehavior';
 import FuelManagement from './pages/FuelManagement';
 import MaintenanceScheduling from './pages/MaintenanceScheduling';
-import ComplianceManagement from './pages/ComplianceManagement';
+import ComplianceRegistry from './pages/ComplianceRegistry';
 import AssetUtilization from './pages/AssetUtilization';
 import Reports from './pages/Reports';
 import PartsInventory from './pages/PartsInventory';
@@ -31,7 +31,10 @@ import Technicians from './pages/Technicians';
 import FieldServiceReports from './pages/FieldServiceReports';
 import Inspections from './pages/Inspections';
 import Workshop from './pages/Workshop';
+import TireInventory from './pages/TireInventory';
+import OperatorScorecards from './pages/OperatorScorecards';
 import InstallPWA from './components/InstallPWA';
+import CommandPalette from './components/CommandPalette';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,8 +63,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <InstallPWA />
         <BrowserRouter>
+          <InstallPWA />
+          <CommandPalette />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={
@@ -83,7 +87,8 @@ export default function App() {
               <Route path="driver-behavior" element={<DriverBehavior />} />
               <Route path="fuel-management" element={<FuelManagement />} />
               <Route path="maintenance-scheduling" element={<MaintenanceScheduling />} />
-              <Route path="compliance" element={<ComplianceManagement />} />
+              <Route path="compliance" element={<ComplianceRegistry />} />
+              <Route path="operator-scorecards" element={<OperatorScorecards />} />
               <Route path="utilization" element={<AssetUtilization />} />
               <Route path="reports" element={<Reports />} />
               <Route path="users" element={<UserManagement />} />
@@ -91,6 +96,7 @@ export default function App() {
               <Route path="field-service-reports" element={<FieldServiceReports />} />
               <Route path="inspections" element={<Inspections />} />
               <Route path="workshop" element={<Workshop />} />
+              <Route path="tires" element={<TireInventory />} />
             </Route>
           </Routes>
         </BrowserRouter>

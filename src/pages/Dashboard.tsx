@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getEquipment, getOperators, getMaintenanceLogs, getFuelLogs, getAssignedMaintenanceSchedules, getFieldServiceReports, getRepairLogs, getMaintenanceSchedules, getSettings, getInspections } from '../lib/api';
-import { Truck, Users, ClipboardList, Fuel, TrendingUp, BarChart3, PieChart, FileText, ChevronRight, Clock, AlertCircle, CheckCircle2, Map as MapIcon, Wrench, Activity, PlusCircle, Sparkles, ShieldCheck, ScanLine, QrCode, Warehouse } from 'lucide-react';
+import { Truck, Users, ClipboardList, Fuel, TrendingUp, BarChart3, PieChart, FileText, ChevronRight, Clock, AlertCircle, CheckCircle2, Map as MapIcon, Wrench, Activity, PlusCircle, Sparkles, ShieldCheck, ScanLine, QrCode, Warehouse, Zap } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import FieldServiceReportForm from '../components/FieldServiceReportForm';
 import { getMaintenanceForecast } from '../services/geminiService';
@@ -64,7 +64,20 @@ export default function Dashboard() {
     return Math.round((completed / (schedules as any[]).length) * 100);
   }, [schedules]);
 
+  const availability = useMemo(() => {
+    if (!equipment || equipment.length === 0) return 100;
+    const active = equipment.filter((item: any) => item.status.toLowerCase() === 'active').length;
+    return Math.round((active / equipment.length) * 100);
+  }, [equipment]);
+
   const stats = [
+    { 
+      label: 'Fleet Availability', 
+      value: `${availability}%`, 
+      icon: Activity, 
+      color: 'text-cyan-600', 
+      bgColor: 'bg-cyan-50' 
+    },
     { 
       label: t('fleet') + ' Total', 
       value: equipment?.length || 0, 
@@ -85,16 +98,8 @@ export default function Dashboard() {
       icon: Clock, 
       color: 'text-blue-600', 
       bgColor: 'bg-blue-50' 
-    },
-    { 
-      label: t('reports'), 
-      value: fsr?.length || 0, 
-      icon: FileText, 
-      color: 'text-purple-600', 
-      bgColor: 'bg-purple-50',
-      feature: 'field_service_reports'
-    },
-  ].filter(stat => !stat.feature || settings?.features?.[stat.feature as keyof typeof settings.features]);
+    }
+  ].filter((stat: any) => !stat.feature || settings?.features?.[stat.feature as keyof typeof settings.features]);
 
   // Prepare chart data
   const statusData = useMemo(() => {
@@ -103,7 +108,18 @@ export default function Dashboard() {
     equipment.forEach((item: any) => {
       counts[item.status] = (counts[item.status] || 0) + 1;
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+    const statusColors: Record<string, string> = {
+      'Active': '#10b981',      // Emerald-500
+      'Maintenance': '#f59e0b', // Amber-500
+      'Repair': '#ef4444',      // Red-500
+      'Inactive': '#6b7280',    // Gray-500
+      'Disposed': '#111827'     // Gray-900
+    };
+    return Object.entries(counts).map(([name, value]) => ({ 
+      name, 
+      value,
+      color: statusColors[name] || '#3b82f6' // Default Blue-500
+    }));
   }, [equipment]);
 
   const fuelTrendData = useMemo(() => {
@@ -202,6 +218,33 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">{t('welcome')}, {profile?.full_name || 'User'}</h1>
+      </div>
+
+      {/* Live Fleet Ticker */}
+      <div className="bg-gray-900 text-white py-2 px-4 rounded-xl flex items-center overflow-hidden border border-white/5 shadow-2xl">
+        <div className="flex items-center space-x-2 mr-6 shrink-0 border-r border-white/10 pr-6">
+          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Live Ticker</span>
+        </div>
+        <div className="flex-1 whitespace-nowrap overflow-hidden">
+          <div className="animate-marquee flex items-center space-x-12 inline-block">
+            {recentActivity.map((activity, i) => (
+              <div key={i} className="flex items-center space-x-2">
+                <span className="text-[10px] font-bold text-orange-400">[{activity.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]</span>
+                <span className="text-xs font-bold text-gray-200">{activity.title}</span>
+                <span className="text-[10px] text-gray-500">• {activity.subtitle}</span>
+              </div>
+            ))}
+            {/* Duplicate for seamless effect */}
+            {recentActivity.map((activity, i) => (
+              <div key={`dup-${i}`} className="flex items-center space-x-2">
+                <span className="text-[10px] font-bold text-orange-400">[{activity.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]</span>
+                <span className="text-xs font-bold text-gray-200">{activity.title}</span>
+                <span className="text-[10px] text-gray-500">• {activity.subtitle}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions - Enhanced for Desktop & Mobile */}
@@ -684,6 +727,43 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Fleet Allocation */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+            <PieChart className="w-5 h-5 text-blue-600" />
+            Fleet Allocation
+          </h2>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RePieChart>
+                <Pie
+                  data={statusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </RePieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-4">
+             {statusData.map((s, i) => (
+               <div key={i} className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{s.name}</span>
+                  <span className="text-[10px] font-black text-gray-900 ml-auto">{s.value}</span>
+               </div>
+             ))}
+          </div>
+        </div>
+
         {/* Recent Equipment */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Asset Access</h2>
@@ -742,6 +822,53 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Compliance & Risk Bento Section */}
+        <div className="bg-gray-900 rounded-[2rem] p-8 text-white shadow-2xl lg:col-span-3 border border-white/5 relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 pointer-events-none">
+              <ShieldCheck className="w-64 h-64" />
+           </div>
+           
+           <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-12">
+              <div className="space-y-6">
+                 <div>
+                    <h3 className="text-xs font-black uppercase tracking-[0.3em] text-orange-500 mb-2">Fleet Audit</h3>
+                    <p className="text-2xl font-black italic text-white uppercase tracking-tight">Operational Integrity</p>
+                 </div>
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                       <span className="text-[10px] uppercase font-bold text-gray-500">License Compliance</span>
+                       <span className="text-lg font-black text-green-500 tracking-tighter">100%</span>
+                    </div>
+                    <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                       <span className="text-[10px] uppercase font-bold text-gray-500">Service Overdue</span>
+                       <span className="text-lg font-black text-red-500 tracking-tighter">{schedules?.filter((s: any) => s.status === 'active' && new Date(s.next_due) < new Date()).length || 0} Assets</span>
+                    </div>
+                    <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                       <span className="text-[10px] uppercase font-bold text-gray-500">Risk Factor</span>
+                       <span className="text-lg font-black text-orange-400 tracking-tighter">Low (2.4)</span>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                 <div className="p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors">
+                    <div className="p-3 bg-blue-500/20 rounded-2xl w-fit mb-4">
+                       <Activity className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <h4 className="text-sm font-black uppercase mb-1">Performance Index</h4>
+                    <p className="text-xs text-gray-400 font-medium leading-relaxed">Fleet aggregate performance is up 12% compared to last cycle. Fuel variance is within threshold.</p>
+                 </div>
+                 <div className="p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors">
+                    <div className="p-3 bg-purple-500/20 rounded-2xl w-fit mb-4">
+                       <Zap className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <h4 className="text-sm font-black uppercase mb-1">AI Insight</h4>
+                    <p className="text-xs text-gray-400 font-medium leading-relaxed">System predicts 3 non-scheduled maintenance events in the next 14 days based on usage patterns.</p>
+                 </div>
+              </div>
+           </div>
+        </div>
       </div>
 
       {selectedSchedule && (

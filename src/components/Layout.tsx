@@ -6,20 +6,35 @@ import { getSettings } from '../lib/api';
 import { 
   LayoutDashboard, Truck, Users, Fuel, Settings, LogOut, 
   ClipboardList, Wrench, AlertTriangle, FileText, Package, 
-  Map, Activity, Menu, X, Wifi, WifiOff, PlusCircle, ScanLine, ShieldCheck, Languages, Warehouse
+  Map, Activity, Menu, X, Wifi, WifiOff, PlusCircle, ScanLine, ShieldCheck, Languages, Warehouse,
+  Moon, Sun, Circle, Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import QRScanner from './QRScanner';
+import DiagnosticsModal from './DiagnosticsModal';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../lib/theme';
+
+import SyncManager from './SyncManager';
 
 export default function Layout() {
   const { t, i18n } = useTranslation();
   const { signOut, profile } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState(
@@ -68,6 +83,7 @@ export default function Layout() {
     { to: '/', icon: LayoutDashboard, label: t('dashboard') },
     { to: '/equipment', icon: Truck, label: t('fleet') },
     { to: '/workshop', icon: Warehouse, label: t('workshop'), feature: 'maintenance', roles: ['Admin', 'Manager', 'Technician'] },
+    { to: '/tires', icon: Circle, label: 'Tires', feature: 'maintenance', roles: ['Admin', 'Manager', 'Technician'] },
     { to: '/operators', icon: Users, label: t('operators') || 'Operators', roles: ['Admin', 'Manager'] },
     { to: '/fuel', icon: Fuel, label: t('fuel_logs') || 'Fuel Logs', feature: 'fuel_logs', roles: ['Admin', 'Manager', 'Operator'] },
     { to: '/parts', icon: Package, label: t('inventory'), feature: 'parts', roles: ['Admin', 'Manager', 'Technician'] },
@@ -78,7 +94,8 @@ export default function Layout() {
     { to: '/driver-behavior', icon: Activity, label: t('driver_behavior') || 'Driver Behavior', feature: 'driver_behavior', roles: ['Admin', 'Manager', 'Operator'] },
     { to: '/fuel-management', icon: Fuel, label: t('fuel_management') || 'Fuel Management', feature: 'fuel_management', roles: ['Admin', 'Manager'] },
     { to: '/maintenance-scheduling', icon: ClipboardList, label: t('scheduling') || 'Scheduling', feature: 'scheduling', roles: ['Admin', 'Manager'] },
-    { to: '/compliance', icon: FileText, label: t('compliance') || 'Compliance', feature: 'compliance', roles: ['Admin', 'Manager', 'Operator'] },
+    { to: '/compliance', icon: ShieldCheck, label: 'Compliance Registry', feature: 'compliance', roles: ['Admin', 'Manager', 'Operator'] },
+    { to: '/operator-scorecards', icon: Star, label: 'Scorecards', feature: 'driver_behavior', roles: ['Admin', 'Manager'] },
     { to: '/utilization', icon: Activity, label: t('utilization') || 'Utilization', feature: 'utilization', roles: ['Admin', 'Manager'] },
     { to: '/reports', icon: FileText, label: t('reports') || 'Reports', feature: 'reports', roles: ['Admin', 'Manager'] },
     { to: '/field-service-reports', icon: FileText, label: t('field_service_reports') || 'Field Service Reports', feature: 'field_service_reports', roles: ['Admin', 'Manager', 'Technician'] },
@@ -127,18 +144,35 @@ export default function Layout() {
             <span>{settings?.company_name || 'MineFleet'}</span>
           </h1>
         </div>
-        <div className="flex items-center">
-          {isOnline ? (
-            <div className="flex items-center text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full border border-green-100 uppercase tracking-widest">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
-              Live Connection
-            </div>
-          ) : (
-            <div className="flex items-center text-[10px] text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-full border border-red-100 uppercase tracking-widest">
-              <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1.5"></span>
-              Offline Mode
-            </div>
-          )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            {isOnline ? (
+              <div className="flex items-center text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full border border-green-100 uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
+                Live
+              </div>
+            ) : (
+              <div className="flex items-center text-[10px] text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-full border border-red-100 uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1.5"></span>
+                Offline
+              </div>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => setIsScanning(true)}
+              className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
+              title="Pulse Scan"
+            >
+              <ScanLine className="w-4 h-4" />
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto p-4 space-y-1">
@@ -187,7 +221,17 @@ export default function Layout() {
           </button>
         </div>
       </div>
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 space-y-1">
+        <button
+          onClick={() => {
+            setIsDiagnosticsOpen(true);
+            setIsMobileMenuOpen(false);
+          }}
+          className="flex items-center space-x-3 px-3 py-2 w-full text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors group"
+        >
+          <ShieldCheck className="w-5 h-5 text-gray-500 group-hover:text-orange-600" />
+          <span className="font-bold text-sm">Diagnostics</span>
+        </button>
         <button
           onClick={handleSignOut}
           className="flex items-center space-x-3 px-3 py-2 w-full text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
@@ -200,38 +244,53 @@ export default function Layout() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-zinc-950 text-zinc-50' : 'bg-gray-50 text-gray-900'} flex flex-col lg:flex-row transition-colors duration-300`}>
       {/* Mobile Header */}
-      <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 pt-safe">
+      <header className={`lg:hidden ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border-b px-4 py-3 flex items-center justify-between sticky top-0 z-40 pt-safe transition-colors`}>
         <div className="flex items-center space-x-2">
           <h1 className="text-lg font-bold text-orange-600 flex items-center space-x-2">
             <Truck className="w-5 h-5" />
-            <span>Fanned Fleet</span>
+            <span>Faned Fleet</span>
           </h1>
           <div className="flex items-center">
             {isOnline ? (
-              <div className="flex items-center text-[10px] text-green-600 font-bold ml-2 bg-green-50 px-1.5 py-0.5 rounded">
+              <div className="flex items-center text-[10px] text-green-600 font-bold ml-2 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded">
                 <Wifi className="w-3 h-3 mr-1" />
                 ONLINE
               </div>
             ) : (
-              <div className="flex items-center text-[10px] text-red-600 font-bold ml-2 bg-red-50 px-1.5 py-0.5 rounded">
+              <div className="flex items-center text-[10px] text-red-600 font-bold ml-2 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded">
                 <WifiOff className="w-3 h-3 mr-1" />
                 OFFLINE
               </div>
             )}
           </div>
         </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => setIsScanning(true)}
+            className="p-2 text-orange-600 bg-orange-50 dark:bg-orange-950/20 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-950/40 transition-colors active:scale-95"
+            title="Scan Asset QR"
+          >
+            <ScanLine className="w-5 h-5" />
+          </button>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+        </div>
       </header>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-col sticky top-0 h-screen">
+      <aside className={`hidden lg:flex w-64 ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border-r flex-col sticky top-0 h-screen transition-colors`}>
         <NavContent />
       </aside>
 
@@ -329,11 +388,17 @@ export default function Layout() {
         )}
       </AnimatePresence>
 
+      <DiagnosticsModal 
+        isOpen={isDiagnosticsOpen}
+        onClose={() => setIsDiagnosticsOpen(false)}
+      />
+
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
           <Outlet context={{ setIsScanning }} />
         </div>
+        <SyncManager />
       </main>
 
       {/* Mobile Bottom Navigation */}

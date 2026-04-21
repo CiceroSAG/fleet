@@ -1,148 +1,76 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-export async function getMaintenanceForecast(fleetData: any) {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze the following fleet maintenance and fuel data to predict potential failures or upcoming maintenance needs for specific equipment.
-        
-        Fleet Data:
-        ${JSON.stringify(fleetData)}
-        
-        Provide a JSON response with the following structure:
-        {
-          "recommendations": [
-            {
-              "equipment_id": "string",
-              "asset_tag": "string",
-              "prediction": "string (short prediction of what might fail)",
-              "reasoning": "string (why, based on data trends)",
-              "urgency": "low" | "medium" | "high" | "critical",
-              "recommended_action": "string"
-            }
-          ]
-        }
-      `,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            recommendations: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  equipment_id: { type: Type.STRING },
-                  asset_tag: { type: Type.STRING },
-                  prediction: { type: Type.STRING },
-                  reasoning: { type: Type.STRING },
-                  urgency: { type: Type.STRING },
-                  recommended_action: { type: Type.STRING }
-                },
-                required: ["equipment_id", "asset_tag", "prediction", "reasoning", "urgency", "recommended_action"]
-              }
-            }
-          },
-          required: ["recommendations"]
-        }
-      }
-    });
+export async function transcribeAndProfessionalize(text: string, language: 'en' | 'fr' = 'en') {
+  if (!process.env.GEMINI_API_KEY) return text;
+  
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `As a professional fleet maintenance manager, rewrite the following field service action description to be technical, clear, and professional. Keep it in ${language === 'en' ? 'English' : 'French'}.
+    
+    Description: "${text}"`,
+  });
 
-    return JSON.parse(response.text || '{"recommendations": []}');
-  } catch (error) {
-    console.error("Gemini Forecasting Error:", error);
-    return { recommendations: [] };
-  }
+  return response.text?.trim() || text;
 }
 
-export async function getRootCauseAnalysis(incidentData: any) {
+export async function predictEquipmentFailure(historicalData: any[]) {
+  if (!process.env.GEMINI_API_KEY) return "AI Forecasting unavailable without API Key.";
+
+  const prompt = `Analyze this equipment maintenance history and predict possible failures in the next 7 days. Focus on critical components like engine, hydraulics, and transmission.
+  
+  Data: ${JSON.stringify(historicalData.slice(0, 20))}
+  
+  Provide a concise, high-priority summary with estimated probability.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+  });
+
+  return response.text?.trim() || "Unable to generate prediction.";
+}
+
+export async function generatePMPlan(equipment: any, currentHours: number) {
+  if (!process.env.GEMINI_API_KEY) return null;
+
+  const prompt = `Develop a maintenance plan for a ${equipment.manufacturer} ${equipment.model} currenty at ${currentHours} hours.
+  Recommend next 3 service intervals and critical checks. Return in JSON format: { plan: [ { hours: number, tasks: string[] } ] }`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json"
+    }
+  });
+
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze this incident and fleet history to identify the root cause and suggest preventive measures.
-        
-        Incident: ${JSON.stringify(incidentData)}
-        
-        Return JSON structure:
-        {
-          "root_cause": "string",
-          "contributing_factors": ["string"],
-          "preventive_actions": ["string"],
-          "severity_analysis": "string"
-        }
-      `,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            root_cause: { type: Type.STRING },
-            contributing_factors: { type: Type.ARRAY, items: { type: Type.STRING } },
-            preventive_actions: { type: Type.ARRAY, items: { type: Type.STRING } },
-            severity_analysis: { type: Type.STRING }
-          },
-          required: ["root_cause", "contributing_factors", "preventive_actions"]
-        }
-      }
-    });
     return JSON.parse(response.text || '{}');
-  } catch (error) {
-    console.error("Gemini Root Cause Error:", error);
+  } catch (e) {
     return null;
   }
 }
 
-export async function detectTelematicsAnomalies(telemetryData: any) {
+export async function getMaintenanceForecast(data: any) {
+  if (!process.env.GEMINI_API_KEY) return { summary: "AI Forecasting Unavailable", probability: 0 };
+
+  const prompt = `Based on the following maintenance and operational data, provide a 7-day failure risk assessment.
+  Data: ${JSON.stringify(data)}
+  Return a brief summary and a risk percentage. JSON: { summary: string, probability: number }`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json"
+    }
+  });
+
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze these telematics logs for anomalies in driver behavior or machine performance.
-        Data: ${JSON.stringify(telemetryData)}
-        
-        Return JSON structure:
-        {
-          "anomalies": [
-            {
-              "type": "behavior" | "performance",
-              "description": "string",
-              "confidence": number (0-1),
-              "impact_score": number (1-10)
-            }
-          ]
-        }
-      `,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            anomalies: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  type: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  confidence: { type: Type.NUMBER },
-                  impact_score: { type: Type.NUMBER }
-                },
-                required: ["type", "description", "confidence", "impact_score"]
-              }
-            }
-          },
-          required: ["anomalies"]
-        }
-      }
-    });
-    return JSON.parse(response.text || '{"anomalies": []}');
-  } catch (error) {
-    console.error("Gemini Anomaly Error:", error);
-    return { anomalies: [] };
+    return JSON.parse(response.text || '{"summary": "No data", "probability": 0}');
+  } catch (e) {
+    return { summary: "Prediction error", probability: 0 };
   }
 }

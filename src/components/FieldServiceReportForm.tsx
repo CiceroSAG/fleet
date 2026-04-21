@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEquipment, getTechnicians, createFieldServiceReport, updateFieldServiceReport, getTechnicianByUserId } from '../lib/api';
-import { Plus, Trash2, Save, X, Building2, Wrench, Package, UserCheck, ShieldCheck, CheckCircle2, AlertTriangle, User, ChevronDown, Check } from 'lucide-react';
+import { Plus, Trash2, Save, X, Building2, Wrench, Package, UserCheck, ShieldCheck, CheckCircle2, AlertTriangle, User, ChevronDown, Check, Mic, Wand2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth';
+import { transcribeAndProfessionalize } from '../services/geminiService';
+import { useOffline } from '../lib/offline';
 
 interface FieldServiceReportFormProps {
   onClose: () => void;
@@ -39,6 +41,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
   const queryClient = useQueryClient();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { profile } = useAuth();
+  const { isOnline, addToQueue } = useOffline();
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
   const { data: technicians } = useQuery({ queryKey: ['technicians'], queryFn: getTechnicians });
 
@@ -63,7 +66,7 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
     manager_date: initialData?.manager_date || new Date().toISOString().split('T')[0],
     kamoa_hod_name: initialData?.kamoa_hod_name || '',
     kamoa_hod_date: initialData?.kamoa_hod_date || new Date().toISOString().split('T')[0],
-    technician_id: initialData?.technician_id || profile?.id || '',
+    technician_id: initialData?.technician_id || '',
     report_date: initialData?.report_date || new Date().toISOString().split('T')[0],
     status: initialData?.status || 'pending',
     parts_replaced: initialData?.parts_replaced || '',
@@ -89,21 +92,51 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
 
   // Update technician name when record is loaded
   useEffect(() => {
-    if (technicianRecord?.name) {
-      setReport(prev => ({ ...prev, technician_name: technicianRecord.name }));
-      if (!selectedTechnicians.includes(technicianRecord.id)) {
-        setSelectedTechnicians(prev => [...prev, technicianRecord.id]);
-      }
+    // Only auto-add the technician if we are creating a NEW report
+    if (technicianRecord?.name && !initialData?.id) {
+      setReport(prev => ({ 
+        ...prev, 
+        technician_name: technicianRecord.name,
+        // The main report table's technician_id field uses profiles.id (User ID)
+        technician_id: profile?.id || ''
+      }));
+      setSelectedTechnicians(prev => {
+        if (!prev.includes(technicianRecord.id)) {
+          return [...prev, technicianRecord.id];
+        }
+        return prev;
+      });
     }
-  }, [technicianRecord]);
+  }, [technicianRecord, initialData?.id, profile?.id]);
 
   useEffect(() => {
-    if (initialData?.technician_ids) {
+    if (initialData?.technician_ids && initialData.technician_ids.length > 0) {
       setSelectedTechnicians(initialData.technician_ids);
+      
+      // Ensure report state has valid metadata if missing
+      if (!report.technician_name) {
+        const firstTech = technicians?.find((t: any) => t.id === initialData.technician_ids![0]);
+        if (firstTech) {
+          setReport(prev => ({
+            ...prev,
+            // Keep the User ID for report.technician_id
+            technician_id: prev.technician_id || firstTech.user_id || '',
+            technician_name: firstTech.name
+          }));
+        }
+      }
     } else if (initialData?.technician_id) {
-      setSelectedTechnicians([initialData.technician_id]);
+      // If we have a technician_id but no technician_ids list, 
+      // check if it's a profile ID or a technician ID
+      const techByProfile = technicians?.find((t: any) => t.user_id === initialData.technician_id);
+      if (techByProfile) {
+        setSelectedTechnicians([techByProfile.id]);
+      } else {
+        // Fallback or legacy where it might have been saved as a tech ID
+        setSelectedTechnicians([initialData.technician_id]);
+      }
     }
-  }, [initialData]);
+  }, [initialData, technicians]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -119,6 +152,8 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
   const [parts, setParts] = useState(initialData?.parts || [{ part_description: '', quantity_used: 0, remark: '' }]);
   const [customMaintField, setCustomMaintField] = useState('');
   const [customRepairField, setCustomRepairField] = useState('');
+  const [isRecording, setIsRecording] = useState<string | null>(null);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
 
   const mutation = useMutation({
     mutationFn: (data: { report: any; assets: any[]; parts: any[]; technician_ids: string[] }) => 
@@ -198,20 +233,81 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
     setReport({ ...report, repair_details: newRepair });
   };
 
+  const startVoiceDictation = async (field: string) => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech Recognition is not supported in this browser.');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setIsRecording(field);
+    recognition.onend = () => setIsRecording(null);
+    recognition.onerror = () => setIsRecording(null);
+
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setIsProcessingVoice(true);
+      try {
+        const professional = await transcribeAndProfessionalize(transcript);
+        setReport(prev => ({ ...prev, [field]: (prev[field] ? prev[field] + '\n' : '') + professional }));
+      } catch (e) {
+        console.error('Gemini processing failed:', e);
+        setReport(prev => ({ ...prev, [field]: (prev[field] ? prev[field] + '\n' : '') + transcript }));
+      } finally {
+        setIsProcessingVoice(false);
+      }
+    };
+
+    recognition.start();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate({
+    
+    const submissionData = {
       report,
       assets: assets.filter(a => a.equipment_id),
       parts: parts.filter(p => p.part_description),
-      technician_ids: selectedTechnicians
-    });
+      technician_ids: selectedTechnicians,
+      scheduleId: initialData?.scheduleId
+    };
+
+    if (!isOnline) {
+      addToQueue(submissionData);
+      onClose();
+      return;
+    }
+
+    mutation.mutate(submissionData);
   };
 
   const toggleTechnician = (id: string) => {
-    setSelectedTechnicians(prev => 
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
-    );
+    setSelectedTechnicians(prev => {
+      const next = prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id];
+      
+      // Update report record with primary technician name/id for legacy support
+      const primaryTech = technicians?.find((t: any) => t.id === next[0]);
+      if (primaryTech) {
+        setReport(r => ({ 
+          ...r, 
+          // The main table expects a profile.id (User ID)
+          technician_id: primaryTech.user_id || r.technician_id,
+          technician_name: primaryTech.name 
+        }));
+      } else {
+        setReport(r => ({ 
+          ...r, 
+          technician_id: '',
+          technician_name: '' 
+        }));
+      }
+      
+      return next;
+    });
   };
 
   return (
@@ -545,8 +641,15 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
           {/* Section 3: Job Details */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
-              <div className="flex items-center space-x-2 text-orange-600 border-b border-orange-100 pb-2">
+              <div className="flex items-center justify-between border-b border-orange-100 pb-2">
                 <h3 className="font-semibold uppercase tracking-wider text-sm">Description of Job Required</h3>
+                <button
+                  type="button"
+                  onClick={() => startVoiceDictation('job_description')}
+                  className={`p-1.5 rounded-lg transition-all ${isRecording === 'job_description' ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
+                >
+                  {isProcessingVoice && isRecording === 'job_description' ? <Wand2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                </button>
               </div>
               <textarea
                 required
@@ -558,8 +661,15 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               />
             </div>
             <div className="space-y-4">
-              <div className="flex items-center space-x-2 text-orange-600 border-b border-orange-100 pb-2">
+              <div className="flex items-center justify-between border-b border-orange-100 pb-2">
                 <h3 className="font-semibold uppercase tracking-wider text-sm">Action Taken / Work Done</h3>
+                <button
+                  type="button"
+                  onClick={() => startVoiceDictation('action_taken')}
+                  className={`p-1.5 rounded-lg transition-all ${isRecording === 'action_taken' ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
+                >
+                  {isProcessingVoice && isRecording === 'action_taken' ? <Wand2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                </button>
               </div>
               <textarea
                 required
@@ -764,31 +874,31 @@ export default function FieldServiceReportForm({ onClose, initialData }: FieldSe
               </div>
             </div>
           </section>
+          
+          <div className="pt-6 border-t border-gray-100 bg-gray-50/50 -mx-8 -mb-8 p-8 flex justify-end space-x-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 text-gray-600 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="px-8 py-2 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 shadow-lg shadow-orange-200 transition-all flex items-center space-x-2 disabled:opacity-50"
+            >
+              {mutation.isPending ? (
+                <span>Submitting...</span>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  <span>{initialData?.id ? 'Update Report' : 'Submit Report'}</span>
+                </>
+              )}
+            </button>
+          </div>
         </form>
-
-        <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-2 text-gray-600 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={mutation.isPending}
-            className="px-8 py-2 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 shadow-lg shadow-orange-200 transition-all flex items-center space-x-2 disabled:opacity-50"
-          >
-            {mutation.isPending ? (
-              <span>Submitting...</span>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                <span>Submit Report</span>
-              </>
-            )}
-          </button>
-        </div>
       </motion.div>
     </motion.div>
   );

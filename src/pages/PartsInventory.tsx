@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPartsInventory, createPart, updatePart, deletePart, getSettings } from '../lib/api';
-import { Package, Plus, Search, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit2, Trash2, X, Filter, ShoppingCart, DollarSign, Activity } from 'lucide-react';
+import { getPartsInventory, createPart, updatePart, deletePart, getSettings, getInventoryTransactions } from '../lib/api';
+import { Package, Plus, Search, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit2, Trash2, X, Filter, ShoppingCart, DollarSign, Activity, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getCurrencySymbol } from '../lib/utils';
 
 export default function Inventory() {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory'],
     queryFn: getPartsInventory
+  });
+
+  const { data: history } = useQuery({
+    queryKey: ['inventoryHistory', editingPart?.id],
+    queryFn: () => getInventoryTransactions(editingPart?.id),
+    enabled: !!editingPart?.id && isHistoryOpen
   });
 
   const { data: settings } = useQuery({
@@ -29,7 +36,7 @@ export default function Inventory() {
     category: 'Mechanical',
     current_stock: 0,
     min_stock: 5,
-    unit_price: 0,
+    unit_cost: 0,
     supplier_id: ''
   });
 
@@ -39,6 +46,10 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       setIsFormOpen(false);
       resetForm();
+    },
+    onError: (error: any) => {
+      console.error('Error creating part:', error);
+      alert('Error saving part: ' + (error.message || 'Check part number uniqueness'));
     }
   });
 
@@ -48,6 +59,10 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       setIsFormOpen(false);
       resetForm();
+    },
+    onError: (error: any) => {
+      console.error('Error updating part:', error);
+      alert('Error updating part: ' + (error.message || 'Possible duplicate part number'));
     }
   });
 
@@ -65,7 +80,7 @@ export default function Inventory() {
       category: 'Mechanical',
       current_stock: 0,
       min_stock: 5,
-      unit_price: 0,
+      unit_cost: 0,
       supplier_id: ''
     });
     setEditingPart(null);
@@ -79,7 +94,7 @@ export default function Inventory() {
       category: part.category || 'Mechanical',
       current_stock: part.current_stock,
       min_stock: part.min_stock,
-      unit_price: part.unit_price,
+      unit_cost: part.unit_cost || part.unit_price || 0,
       supplier_id: part.supplier_id || ''
     });
     setIsFormOpen(true);
@@ -87,10 +102,17 @@ export default function Inventory() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clean data for Supabase
+    const payload = {
+      ...formData,
+      supplier_id: formData.supplier_id === '' ? null : formData.supplier_id
+    };
+
     if (editingPart) {
-      updateMutation.mutate({ id: editingPart.id, part: formData });
+      updateMutation.mutate({ id: editingPart.id, part: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -100,7 +122,7 @@ export default function Inventory() {
   );
 
   const lowStockItems = inventory?.filter((item: any) => item.current_stock <= item.min_stock);
-  const totalValue = inventory?.reduce((sum: number, item: any) => sum + (item.current_stock * item.unit_price), 0) || 0;
+  const totalValue = inventory?.reduce((sum: number, item: any) => sum + (item.current_stock * (item.unit_cost || item.unit_price || 0)), 0) || 0;
 
   return (
     <div className="space-y-6">
@@ -249,16 +271,27 @@ export default function Inventory() {
                     </div>
                   </td>
                   <td className="py-4 px-2 text-sm text-gray-600">
-                    {currencySymbol}{(item.unit_price || 0).toFixed(2)}
+                    {currencySymbol}{(item.unit_cost || item.unit_price || 0).toFixed(2)}
                   </td>
                   <td className="py-4 px-2 text-sm font-bold text-gray-900">
-                    {currencySymbol}{((item.current_stock || 0) * (item.unit_price || 0)).toFixed(2)}
+                    {currencySymbol}{((item.current_stock || 0) * (item.unit_cost || item.unit_price || 0)).toFixed(2)}
                   </td>
                   <td className="py-4 px-2 text-right">
                     <div className="flex items-center justify-end space-x-1">
                       <button
+                        onClick={() => {
+                          setEditingPart(item);
+                          setIsHistoryOpen(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-all"
+                        title="View Transactions"
+                      >
+                        <History className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleEdit(item)}
                         className="p-2 text-gray-400 hover:text-orange-600 rounded-lg hover:bg-orange-50 transition-all"
+                        title="Edit Part"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -383,8 +416,8 @@ export default function Inventory() {
                       required
                       step="0.01"
                       min="0"
-                      value={formData.unit_price}
-                      onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) })}
+                      value={formData.unit_cost}
+                      onChange={(e) => setFormData({ ...formData, unit_cost: parseFloat(e.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
                   </div>
@@ -424,6 +457,74 @@ export default function Inventory() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* History Modal */}
+      <AnimatePresence>
+        {isHistoryOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsHistoryOpen(false)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col h-[80vh]"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Transaction History</h2>
+                  <p className="text-xs text-gray-500">{editingPart?.name} ({editingPart?.part_number})</p>
+                </div>
+                <button
+                  onClick={() => setIsHistoryOpen(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
+                   {history?.map((tx: any) => (
+                     <div key={tx.id} className="flex items-start justify-between border-b border-gray-50 pb-4">
+                        <div className="flex items-start space-x-4">
+                           <div className={`p-2 rounded-xl ${
+                             tx.type === 'IN' ? 'bg-green-50 text-green-600' :
+                             tx.type === 'OUT' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
+                           }`}>
+                              {tx.type === 'IN' ? <ArrowDownRight className="w-5 h-5" /> : 
+                               tx.type === 'OUT' ? <ArrowUpRight className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
+                           </div>
+                           <div>
+                              <p className="font-bold text-gray-900">
+                                {tx.type === 'IN' ? 'Stock Received' : tx.type === 'OUT' ? 'Stock Deducted' : 'Adjustment'}
+                              </p>
+                              <p className="text-xs text-gray-500 font-medium">Quantity: {tx.quantity} pcs</p>
+                              {tx.notes && <p className="text-[10px] text-gray-400 mt-1 italic">"{tx.notes}"</p>}
+                           </div>
+                        </div>
+                        <div className="text-right text-[10px] font-bold text-gray-400 uppercase">
+                           <p>{new Date(tx.created_at).toLocaleDateString()}</p>
+                           <p>{new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                     </div>
+                   ))}
+                   {(!history || history.length === 0) && (
+                     <div className="text-center py-12 text-gray-400 italic">
+                        No transactions recorded for this part.
+                     </div>
+                   )}
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

@@ -1,6 +1,6 @@
-# 🚛 Fanned Fleet Management Platform: The Ultimate Operational Manual
+# 🚛 Faned Fleet Management Platform: The Ultimate Operational Manual
 
-This manual provides an exhaustive, step-by-step guide for every feature within the **Fanned Fleet** application. 
+This manual provides an exhaustive, step-by-step guide for every feature within the **Faned Fleet** application. 
 
 ---
 

@@ -140,10 +140,23 @@ export async function deleteCategory(id: string) {
 
 // --- Equipment ---
 let mockEquipmentData = [
-  { id: '11111111-1111-1111-1111-111111111111', asset_tag: 'TRK-001', type: 'Dump Truck', status: 'Active', manufacturer: 'Volvo', model: 'FMX', year: 2022 },
-  { id: '22222222-2222-2222-2222-222222222222', asset_tag: 'EXC-001', type: 'Excavator', status: 'Under Maintenance', manufacturer: 'CAT', model: '320', year: 2021 },
-  { id: '33333333-3333-3333-3333-333333333333', asset_tag: 'LV-001', type: 'Light Vehicle', status: 'Active', manufacturer: 'Toyota', model: 'Hilux', year: 2023 }
+  { id: '11111111-1111-1111-1111-111111111111', asset_tag: 'TRK-001', type: 'Dump Truck', status: 'Active', manufacturer: 'Volvo', model: 'FMX', year: 2022, nfc_tag: 'NFC-TRK-001', qr_code_tag: 'QR-TRK-001' },
+  { id: '22222222-2222-2222-2222-222222222222', asset_tag: 'EXC-001', type: 'Excavator', status: 'Under Maintenance', manufacturer: 'CAT', model: '320', year: 2021, nfc_tag: null, qr_code_tag: 'QR-EXC-001' },
+  { id: '33333333-3333-3333-3333-333333333333', asset_tag: 'LV-001', type: 'Light Vehicle', status: 'Active', manufacturer: 'Toyota', model: 'Hilux', year: 2023, nfc_tag: 'NFC-LV-001', qr_code_tag: null }
 ];
+
+export async function getEquipmentByTag(assetTag: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return mockEquipmentData.find(e => e.asset_tag === assetTag) || null;
+  }
+  const { data, error } = await supabase
+    .from('equipment')
+    .select('*')
+    .eq('asset_tag', assetTag)
+    .single();
+  if (error) return null;
+  return data;
+}
 
 export async function getEquipment() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
@@ -223,6 +236,23 @@ export async function updateEquipment(id: string, equipment: any) {
   }
 
   return data[0];
+}
+
+export async function bulkUpdateEquipmentStatus(ids: string[], status: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    mockEquipmentData = mockEquipmentData.map(e => 
+      ids.includes(e.id) ? { ...e, status } : e
+    );
+    return;
+  }
+  const { data, error } = await supabase
+    .from('equipment')
+    .update({ status, updated_at: new Date().toISOString() })
+    .in('id', ids)
+    .select();
+    
+  if (error) throw error;
+  return data;
 }
 
 export async function deleteEquipment(id: string) {
@@ -2590,8 +2620,8 @@ export async function deletePartsSupplier(id: string) {
 }
 
 let mockPartsInventoryData = [
-  { id: 'p1111111-1111-1111-1111-111111111111', name: 'Oil Filter', part_number: 'OF-100', current_stock: 25, min_stock: 10, unit_price: 15.50, parts_suppliers: { name: 'Global Parts Corp' } },
-  { id: 'p2222222-2222-2222-2222-222222222222', name: 'Brake Pads', part_number: 'BP-200', current_stock: 5, min_stock: 8, unit_price: 85.00, parts_suppliers: { name: 'Fleet Supply Co' } }
+  { id: 'p1111111-1111-1111-1111-111111111111', name: 'Oil Filter', part_number: 'OF-100', current_stock: 25, min_stock: 10, unit_cost: 15.50, unit_price: 15.50, parts_suppliers: { name: 'Global Parts Corp' } },
+  { id: 'p2222222-2222-2222-2222-222222222222', name: 'Brake Pads', part_number: 'BP-200', current_stock: 5, min_stock: 8, unit_cost: 85.00, unit_price: 85.00, parts_suppliers: { name: 'Fleet Supply Co' } }
 ];
 
 export async function getPartsInventory() {
@@ -2660,6 +2690,71 @@ export async function deletePart(id: string) {
   if (error) throw error;
 }
 
+export async function getInventoryTransactions(partId?: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [];
+  }
+  let query = supabase
+    .from('inventory_transactions')
+    .select(`
+      *,
+      parts_inventory (name, part_number),
+      profiles (full_name)
+    `)
+    .order('created_at', { ascending: false });
+  
+  if (partId) query = query.eq('part_id', partId);
+  
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+export async function adjustStock(partId: string, quantity: number, type: 'IN' | 'OUT' | 'ADJUST', notes?: string, referenceId?: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return;
+  }
+  
+  // 1. Get current stock
+  const { data: part, error: fetchError } = await supabase
+    .from('parts_inventory')
+    .select('current_stock, min_stock, name')
+    .eq('id', partId)
+    .single();
+    
+  if (fetchError) throw fetchError;
+  
+  const newStock = type === 'IN' ? part.current_stock + quantity : 
+                   type === 'OUT' ? part.current_stock - quantity : quantity;
+  
+  // 2. Update stock
+  const { error: updateError } = await supabase
+    .from('parts_inventory')
+    .update({ current_stock: newStock })
+    .eq('id', partId);
+    
+  if (updateError) throw updateError;
+  
+  // 3. Log transaction
+  const { error: logError } = await supabase
+    .from('inventory_transactions')
+    .insert([{
+      part_id: partId,
+      type,
+      quantity,
+      new_stock: newStock,
+      notes,
+      reference_id: referenceId
+    }]);
+    
+  if (logError) console.error('Failed to log inventory transaction:', logError);
+  
+  // 4. Check for alerts
+  if (newStock <= part.min_stock) {
+    await createReorderNotification({ ...part, id: partId, current_stock: newStock });
+  }
+}
+
 export async function getEquipmentPartsMapping() {
   if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
     return [];
@@ -2668,16 +2763,44 @@ export async function getEquipmentPartsMapping() {
     .from('equipment_parts_mapping')
     .select(`
       *,
-      equipment (
-        asset_tag,
-        type
-      ),
-      parts_inventory (
-        part_number,
-        name
-      )
+      equipment (asset_tag, type),
+      parts_inventory (part_number, name)
     `)
     .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+// --- Tire Tracking ---
+export async function getTires(equipmentId?: string) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [];
+  }
+  let query = supabase.from('tires').select('*, equipment(asset_tag)');
+  if (equipmentId) query = query.eq('equipment_id', equipmentId);
+  const { data, error } = await query.order('position');
+  if (error) throw error;
+  return data;
+}
+
+export async function logTireAction(action: any) {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return { id: 'mock', ...action, created_at: new Date().toISOString() };
+  }
+  const { data, error } = await supabase.from('tire_actions').insert([action]).select().single();
+  if (error) throw error;
+  return data;
+}
+
+// --- Compliance Alerts ---
+export async function getComplianceAlerts() {
+  if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === '') {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('compliance_alerts')
+    .select('*, equipment(asset_tag)')
+    .order('expiry_date');
   if (error) throw error;
   return data;
 }
@@ -3673,21 +3796,39 @@ export async function updateFieldServiceReport(id: string, report: any, assets: 
     .select()
     .single();
 
-  if (reportError) throw reportError;
+  if (reportError) {
+    console.error('Error updating field service report:', reportError);
+    throw reportError;
+  }
+
+  if (!reportData) {
+    throw new Error('No data returned from report update');
+  }
 
   // Update technicians
-  await supabase.from('field_service_report_technicians').delete().eq('report_id', id);
-  if (technicianIds.length > 0) {
-    const techLinks = technicianIds.map(techId => ({
-      report_id: id,
-      technician_id: techId
-    }));
-    await supabase.from('field_service_report_technicians').insert(techLinks);
+  try {
+    await supabase.from('field_service_report_technicians').delete().eq('report_id', id);
+    if (technicianIds.length > 0) {
+      const techLinks = technicianIds.map(techId => ({
+        report_id: id,
+        technician_id: techId
+      }));
+      await supabase.from('field_service_report_technicians').insert(techLinks);
+    }
+  } catch (techError) {
+    console.error('Error updating technicians:', techError);
+    // Continue as the main report was updated
   }
 
   // Delete existing assets and parts
-  await supabase.from('field_service_report_assets').delete().eq('report_id', id);
-  await supabase.from('field_service_report_parts').delete().eq('report_id', id);
+  try {
+    await Promise.all([
+      supabase.from('field_service_report_assets').delete().eq('report_id', id),
+      supabase.from('field_service_report_parts').delete().eq('report_id', id)
+    ]);
+  } catch (deleteError) {
+    console.error('Error deleting sub-table records:', deleteError);
+  }
 
   // Insert new assets
   if (sanitizedAssets.length > 0) {
@@ -3770,6 +3911,7 @@ export async function getFieldServiceReports() {
       ),
       field_service_report_parts (*),
       field_service_report_technicians (
+        technician_id,
         technicians (
           id,
           name
@@ -3794,7 +3936,11 @@ export async function getFieldServiceReport(id: string) {
         *,
         equipment (*)
       ),
-      field_service_report_parts (*)
+      field_service_report_parts (*),
+      field_service_report_technicians (
+        technician_id,
+        technicians (id, name)
+      )
     `)
     .eq('id', id)
     .single();

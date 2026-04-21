@@ -83,7 +83,7 @@ export default function InstallPWA() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Install Fanned Fleet</h2>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Install Faned Fleet</h2>
               <p className="text-gray-500 font-medium mt-2">
                 Install our app on your device for a faster, offline-ready experience with full camera and NFC support.
               </p>

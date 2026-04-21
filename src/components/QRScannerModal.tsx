@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { X, QrCode, History, CheckSquare, AlertTriangle, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { getEquipmentByTag } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 
-interface QRScannerProps {
-  onScan?: (decodedText: string) => void;
+interface QRScannerModalProps {
   onClose: () => void;
-  title?: string;
 }
 
-export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRScannerProps) {
+export default function QRScannerModal({ onClose }: QRScannerModalProps) {
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -26,6 +24,7 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
     );
 
     async function onScanSuccess(decodedText: string) {
+      // Clear the scanner immediately to stop processing
       scanner.clear().catch(err => console.error("Scanner clear error", err));
       
       setScanResult(decodedText);
@@ -47,7 +46,10 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
       }
     }
 
-    function onScanFailure(error: any) {}
+    function onScanFailure(error: any) {
+      // Common to have many failures as it searches for a QR code
+      // consoles suppressed
+    }
 
     scanner.render(onScanSuccess, onScanFailure);
 
@@ -65,6 +67,7 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
 
   const handleStartInspection = () => {
     if (equipment) {
+      // Navigate to equipment details with inspection intent
       navigate(`/equipment/${equipment.id}?action=inspection`);
       onClose();
     }
@@ -81,7 +84,7 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-zinc-950 text-white">
           <div className="flex items-center gap-2">
             <QrCode className="w-6 h-6 text-orange-500" />
-            <h2 className="text-xl font-black tracking-tight">{title}</h2>
+            <h2 className="text-xl font-black tracking-tight">Machine Pulse Scanner</h2>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors active:scale-95">
             <X className="w-5 h-5" />
@@ -97,8 +100,12 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
                 style={{ minHeight: '300px' }}
               ></div>
               <div className="text-center">
-                <p className="text-gray-900 font-bold text-lg">Scan Asset Tag</p>
-                <p className="text-gray-400 text-sm font-medium mt-1">Center the tag in the frame for interactive workflow</p>
+                <p className="text-gray-900 font-bold text-lg">Scan Asset QR Tag</p>
+                <p className="text-gray-400 text-sm font-medium mt-1">Center the tag in the frame above for instant access</p>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <span className="w-2 h-2 bg-orange-600 rounded-full animate-pulse transition-all"></span>
+                  <p className="text-[10px] text-orange-600 uppercase tracking-widest font-black">Live Optics Ready</p>
+                </div>
               </div>
             </div>
           ) : (
@@ -122,6 +129,8 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
                         setScanResult(null);
                         setEquipment(null);
                         setError(null);
+                        // Trigger a re-render/re-mount of the scanner? 
+                        // Actually easier to just reload the modal or handle it via scanResult state.
                     }}
                     className="mt-4 px-10 py-4 bg-orange-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-orange-600/20 active:scale-95 transition-all"
                   >
@@ -129,7 +138,7 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
                   </button>
                 </div>
               ) : equipment ? (
-                <div className="space-y-8">
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="bg-zinc-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl">
                     <div className="relative z-10">
                       <div className="flex justify-between items-start mb-6">
@@ -148,11 +157,11 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
                           <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Current Task</p>
-                          <p className="text-xs font-black">Active Mode</p>
+                          <p className="text-xs font-black">Mining Operations</p>
                         </div>
                         <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Health Status</p>
-                          <p className="text-xs font-black text-green-400">Optimal</p>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Next Service</p>
+                          <p className="text-xs font-black text-orange-400">In 50.4 Hours</p>
                         </div>
                       </div>
                     </div>
@@ -169,7 +178,7 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
                         </div>
                         <div className="text-left">
                           <p className="font-black text-xl leading-none mb-1">Pre-start Inspection</p>
-                          <p className="text-sm font-medium opacity-80 underline decoration-white/30 underline-offset-4">Safety Checklist</p>
+                          <p className="text-sm font-medium opacity-80 underline decoration-white/30 underline-offset-4">Safety Checklist Required</p>
                         </div>
                       </div>
                     </button>
@@ -198,4 +207,3 @@ export default function QRScanner({ onClose, title = 'Scan Asset QR Code' }: QRS
     </div>
   );
 }
-

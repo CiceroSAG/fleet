@@ -529,6 +529,7 @@ export default function FieldServiceReports() {
             kamoa_hod_name: editingReport.kamoa_hod_name,
             kamoa_hod_date: editingReport.kamoa_hod_date,
             technician_id: editingReport.technician_id,
+            technician_ids: editingReport.field_service_report_technicians?.map((t: any) => t.technician_id) || [],
             report_date: editingReport.report_date,
             status: editingReport.status,
             maintenance_details: editingReport.maintenance_details || {

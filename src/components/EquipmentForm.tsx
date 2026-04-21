@@ -28,6 +28,8 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
     engine_hours: 0,
     license_plate: '',
     vin: '',
+    nfc_tag: '',
+    qr_code_tag: '',
     purchase_date: '',
     purchase_price: 0,
     warranty_start_date: '',
@@ -55,6 +57,8 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
         engine_hours: item.engine_hours || 0,
         license_plate: item.license_plate || '',
         vin: item.vin || '',
+        nfc_tag: item.nfc_tag || '',
+        qr_code_tag: item.qr_code_tag || '',
         purchase_date: item.purchase_date || '',
         purchase_price: item.purchase_price || 0,
         warranty_start_date: item.warranty_start_date || '',
@@ -238,6 +242,28 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
                 value={formData.vin || ''}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">NFC Tag ID</label>
+              <input
+                type="text"
+                name="nfc_tag"
+                value={formData.nfc_tag || ''}
+                onChange={handleChange}
+                placeholder="Not Assigned"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-mono text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">QR Code Tag ID</label>
+              <input
+                type="text"
+                name="qr_code_tag"
+                value={formData.qr_code_tag || ''}
+                onChange={handleChange}
+                placeholder="Not Assigned"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-mono text-sm"
               />
             </div>
             <div>

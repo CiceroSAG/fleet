@@ -112,7 +112,7 @@ export default function QRCodeGenerator({ assetTag, assetName, onClose }: QRCode
           </div>
           
           <p className="mt-6 text-[10px] text-gray-400 font-bold uppercase tracking-widest text-center">
-            Scan this tag with the Fanned Fleet mobile app to instantly access asset records
+            Scan this tag with the Faned Fleet mobile app to instantly access asset records
           </p>
         </div>
       </div>

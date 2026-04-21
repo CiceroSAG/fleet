@@ -1,21 +1,34 @@
-import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEquipmentDetails, getSettings, getWorkshopBays, updateEquipment } from '@/lib/api';
-import { ArrowLeft, Fuel, Wrench, AlertTriangle, Settings, DollarSign, FileText, QrCode, Shield, Calendar, MapPin, Tag, Warehouse } from 'lucide-react';
+import { ArrowLeft, Fuel, Wrench, AlertTriangle, Settings, DollarSign, FileText, QrCode, Shield, Calendar, MapPin, Tag, Warehouse, ClipboardCheck } from 'lucide-react';
 import { getCurrencySymbol } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import QRCodeGenerator from '@/components/QRCodeGenerator';
 import DocumentVault from '@/components/DocumentVault';
+import FieldServiceReportForm from '@/components/FieldServiceReportForm';
 import { useTranslation } from 'react-i18next';
 
 export default function EquipmentDetails() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
   const [showQR, setShowQR] = useState(false);
+  const [showInspectionForm, setShowInspectionForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'documents'>('details');
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'inspection') {
+      setShowInspectionForm(true);
+      // Clean up the URL
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('action');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['equipmentDetails', id],
@@ -76,15 +89,35 @@ export default function EquipmentDetails() {
         </Link>
         
         {(profile?.role?.toLowerCase() === 'admin' || profile?.role?.toLowerCase() === 'manager') && (
-          <button
-            onClick={() => setShowQR(true)}
-            className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
-          >
-            <QrCode className="mr-2 h-4 w-4 text-orange-600" />
-            Generate QR Tag
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowInspectionForm(true)}
+              className="inline-flex items-center px-4 py-2 bg-orange-600 border border-orange-500 rounded-xl text-sm font-bold text-white hover:bg-orange-700 transition-all shadow-sm"
+            >
+              <ClipboardCheck className="mr-2 h-4 w-4" />
+              Inspection
+            </button>
+            <button
+              onClick={() => setShowQR(true)}
+              className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
+            >
+              <QrCode className="mr-2 h-4 w-4 text-orange-600" />
+              QR Tag
+            </button>
+          </div>
         )}
       </div>
+
+      {showInspectionForm && (
+        <FieldServiceReportForm 
+          onClose={() => setShowInspectionForm(false)} 
+          initialData={{
+            job_type: 'Inspection',
+            job_description: 'Pre-start safety inspection triggered via scan Pulsar.',
+            assets: [{ equipment_id: id!, index_value: 0, next_service_date: '' }]
+          }}
+        />
+      )}
 
       {showQR && (
         <QRCodeGenerator 
@@ -136,12 +169,16 @@ export default function EquipmentDetails() {
               <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
                 <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
                   <div className="sm:col-span-1">
-                    <dt className="text-xs font-bold text-gray-400 uppercase flex items-center"><Tag className="w-3 h-3 mr-1" /> NFC Tag</dt>
-                    <dd className="mt-1 text-sm text-gray-900 font-mono">{equipment.nfc_tag || 'Not Assigned'}</dd>
+                    <dt className="text-[10px] font-black text-gray-400 uppercase flex items-center mb-1"><Tag className="w-3 h-3 mr-1" /> NFC Tag Status</dt>
+                    <dd className={`mt-1 text-sm font-black px-3 py-1 rounded-lg inline-block ${equipment.nfc_tag ? 'bg-green-50 text-green-700 ring-1 ring-green-100' : 'bg-red-50 text-red-600 ring-1 ring-red-100 italic'}`}>
+                      {equipment.nfc_tag || 'Not Assigned'}
+                    </dd>
                   </div>
                   <div className="sm:col-span-1">
-                    <dt className="text-xs font-bold text-gray-400 uppercase flex items-center"><QrCode className="w-3 h-3 mr-1" /> QR Code</dt>
-                    <dd className="mt-1 text-sm text-gray-900 font-mono">{equipment.qr_code_tag || 'Not Assigned'}</dd>
+                    <dt className="text-[10px] font-black text-gray-400 uppercase flex items-center mb-1"><QrCode className="w-3 h-3 mr-1" /> QR Code Status</dt>
+                    <dd className={`mt-1 text-sm font-black px-3 py-1 rounded-lg inline-block ${equipment.qr_code_tag ? 'bg-green-50 text-green-700 ring-1 ring-green-100' : 'bg-red-50 text-red-600 ring-1 ring-red-100 italic'}`}>
+                      {equipment.qr_code_tag || 'Not Assigned'}
+                    </dd>
                   </div>
                   <div className="sm:col-span-1">
                     <dt className="text-sm font-medium text-gray-500">Serial Number</dt>

@@ -14,8 +14,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
-          name: 'Fanned Fleet Management',
-          short_name: 'FannedFleet',
+          name: 'Faned Fleet Management',
+          short_name: 'FanedFleet',
           description: 'AI-Powered Logistics & Fleet Management System with NFC/QR tagging and Workshop management.',
           theme_color: '#ea580c',
           background_color: '#ffffff',
