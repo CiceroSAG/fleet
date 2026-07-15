@@ -88,7 +88,7 @@ export default function EquipmentDetails() {
           Back to Equipment
         </Link>
         
-        {(profile?.role?.toLowerCase() === 'admin' || profile?.role?.toLowerCase() === 'manager') && (
+        {(profile?.role?.toLowerCase() === 'admin' || profile?.role?.toLowerCase() === 'manager' || profile?.role?.toLowerCase() === 'technician') && (
           <div className="flex gap-2">
             <button
               onClick={() => setShowInspectionForm(true)}
@@ -205,6 +205,7 @@ export default function EquipmentDetails() {
                     <dd className="mt-1">
                       <select
                         value={equipment.workshop_bay_id || ''}
+                        disabled={profile?.role !== 'Admin' && profile?.role !== 'Manager' && profile?.role !== 'Technician'}
                         onChange={(e) => {
                           const bay_id = e.target.value || null;
                           mutation.mutate({ 
@@ -213,7 +214,7 @@ export default function EquipmentDetails() {
                             status: bay_id ? 'Under Maintenance' : 'Active'
                           });
                         }}
-                        className="w-full sm:w-64 px-3 py-2 bg-gray-50 border-none rounded-lg text-sm font-bold focus:ring-2 focus:ring-orange-500"
+                        className={`w-full sm:w-64 px-3 py-2 border-none rounded-lg text-sm font-bold focus:ring-2 focus:ring-orange-500 ${profile?.role === 'Admin' || profile?.role === 'Manager' || profile?.role === 'Technician' ? 'bg-gray-50' : 'bg-gray-100 cursor-not-allowed opacity-75'}`}
                       >
                         <option value="">{t('available')} (No Bay)</option>
                         {bays?.map((bay: any) => (

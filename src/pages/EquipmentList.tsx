@@ -117,16 +117,18 @@ export default function EquipmentList() {
             <Download className="w-5 h-5" />
             <span>Export</span>
           </button>
-          <button 
-            onClick={() => {
-              setSelectedItem(null);
-              setIsFormOpen(true);
-            }}
-            className="flex items-center justify-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add Equipment</span>
-          </button>
+          {(profile?.role === 'Admin' || profile?.role === 'Manager' || profile?.role === 'Technician') && (
+            <button 
+              onClick={() => {
+                setSelectedItem(null);
+                setIsFormOpen(true);
+              }}
+              className="flex items-center justify-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add Equipment</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -319,13 +321,15 @@ export default function EquipmentList() {
                       >
                         <Wrench className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => { setQrItem(item); setShowQR(true); }}
-                        className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                        title="Generate QR Tag"
-                      >
-                        <QrCode className="w-4 h-4" />
-                      </button>
+                      {(profile?.role === 'Admin' || profile?.role === 'Manager' || profile?.role === 'Technician') && (
+                        <button
+                          onClick={() => { setQrItem(item); setShowQR(true); }}
+                          className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                          title="Generate QR Tag"
+                        >
+                          <QrCode className="w-4 h-4" />
+                        </button>
+                      )}
                       <Link
                         to={`/equipment/${item.id}`}
                         className="p-1 text-gray-400 hover:text-orange-600 transition-colors"
@@ -333,12 +337,14 @@ export default function EquipmentList() {
                       >
                         <Info className="w-5 h-5" />
                       </Link>
-                      <button 
-                        onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
+                      {(profile?.role === 'Admin' || profile?.role === 'Manager' || profile?.role === 'Technician') && (
+                        <button 
+                          onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                      )}
 
                       {openMenuId === item.id && (
                         <div className={`absolute right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 ${
@@ -351,13 +357,15 @@ export default function EquipmentList() {
                             <Edit2 className="w-4 h-4 text-blue-600" />
                             <span>Edit Equipment</span>
                           </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span>Delete Equipment</span>
-                          </button>
+                          {(profile?.role === 'Admin' || profile?.role === 'Manager') && (
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>Delete Equipment</span>
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -460,18 +468,31 @@ export default function EquipmentList() {
             </div>
             
             <div className="flex border-t border-gray-50 pt-3 mt-1 justify-between items-center">
-              <button 
-                onClick={() => handleEdit(item)}
-                className="text-xs font-bold text-gray-500 hover:text-gray-900"
-              >
-                Edit Asset
-              </button>
-              <button 
-                onClick={() => handleDelete(item.id)}
-                className="text-xs font-bold text-red-500 hover:text-red-700"
-              >
-                Delete
-              </button>
+              {(profile?.role === 'Admin' || profile?.role === 'Manager' || profile?.role === 'Technician') ? (
+                <>
+                  <button 
+                    onClick={() => handleEdit(item)}
+                    className="text-xs font-bold text-gray-500 hover:text-gray-900"
+                  >
+                    Edit Asset
+                  </button>
+                  {(profile?.role === 'Admin' || profile?.role === 'Manager') && (
+                    <button 
+                      onClick={() => handleDelete(item.id)}
+                      className="text-xs font-bold text-red-500 hover:text-red-700"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </>
+              ) : (
+                <Link
+                  to={`/equipment/${item.id}`}
+                  className="text-xs font-bold text-orange-600 hover:text-orange-700"
+                >
+                  View Details
+                </Link>
+              )}
             </div>
           </div>
         ))}

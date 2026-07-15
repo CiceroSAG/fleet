@@ -78,7 +78,11 @@ export default function EquipmentForm({ item, onClose }: EquipmentFormProps) {
     },
     onError: (err: any) => {
       console.error('Error saving equipment:', err);
-      setError(err.message || 'An error occurred while saving the equipment.');
+      if (err.message?.includes('row-level security policy')) {
+        setError('Permission Denied: Only Admins, Managers, and Technicians can add or modify equipment assets. Please contact your supervisor if you believe this is an error.');
+      } else {
+        setError(err.message || 'An error occurred while saving the equipment.');
+      }
     }
   });
 
