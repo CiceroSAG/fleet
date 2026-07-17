@@ -4,6 +4,7 @@ import { getPartsInventory, createPart, updatePart, deletePart, getSettings, get
 import { Package, Plus, Search, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit2, Trash2, X, Filter, ShoppingCart, DollarSign, Activity, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getCurrencySymbol } from '../lib/utils';
+import Pagination from '../components/Pagination';
 
 export default function Inventory() {
   const queryClient = useQueryClient();
@@ -11,6 +12,8 @@ export default function Inventory() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory'],
@@ -121,6 +124,11 @@ export default function Inventory() {
     item.part_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const paginatedInventory = filteredInventory?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const lowStockItems = inventory?.filter((item: any) => item.current_stock <= item.min_stock);
   const totalValue = inventory?.reduce((sum: number, item: any) => sum + (item.current_stock * (item.unit_cost || item.unit_price || 0)), 0) || 0;
 
@@ -228,7 +236,7 @@ export default function Inventory() {
               type="text"
               placeholder="Search by part name or number..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
             />
           </div>
@@ -246,7 +254,7 @@ export default function Inventory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredInventory?.map((item: any) => (
+              {paginatedInventory?.map((item: any) => (
                 <tr key={item.id} className="group hover:bg-gray-50 transition-all">
                   <td className="py-4 px-2">
                     <div className="flex items-center space-x-3">
@@ -320,6 +328,14 @@ export default function Inventory() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredInventory?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       </div>
 
       {/* New Part Modal */}

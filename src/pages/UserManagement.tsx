@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProfiles, updateProfileRole } from '../lib/api';
 import { Shield, ShieldAlert, ShieldCheck, User, Search, CheckCircle2, Wrench } from 'lucide-react';
+import Pagination from '../components/Pagination';
 
 export default function UserManagement() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const { data: profiles, isLoading } = useQuery({
@@ -29,6 +32,11 @@ export default function UserManagement() {
   const filteredProfiles = profiles?.filter((profile: any) => 
     profile.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     profile.role?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedProfiles = filteredProfiles?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   const getRoleIcon = (role: string) => {
@@ -78,7 +86,7 @@ export default function UserManagement() {
               type="text"
               placeholder="Search users by email or role..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all"
             />
           </div>
@@ -103,7 +111,7 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredProfiles?.map((profile: any) => (
+              {paginatedProfiles?.map((profile: any) => (
                 <tr key={profile.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -154,6 +162,14 @@ export default function UserManagement() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredProfiles?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       </div>
     </div>
   );

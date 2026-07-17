@@ -7,11 +7,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import Pagination from '../components/Pagination';
 
 export default function FieldServiceReports() {
   const { profile, session } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(new URLSearchParams(window.location.search).get('action') === 'new');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const [editingReport, setEditingReport] = useState<any>(null);
@@ -312,6 +315,11 @@ export default function FieldServiceReports() {
     return matchesSearch && matchesTech;
   });
 
+  const paginatedReports = filteredReports?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -388,7 +396,7 @@ export default function FieldServiceReports() {
             type="text"
             placeholder="Search reports by workplace, description, or technician..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
           />
         </div>
@@ -397,7 +405,7 @@ export default function FieldServiceReports() {
           <Filter className="w-5 h-5 text-gray-400" />
           <select
             value={techFilter}
-            onChange={(e) => setTechFilter(e.target.value)}
+            onChange={(e) => { setTechFilter(e.target.value); setCurrentPage(1); }}
             className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all text-gray-600 font-medium min-w-[200px]"
           >
             <option value="all">All Technicians</option>
@@ -417,7 +425,7 @@ export default function FieldServiceReports() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <AnimatePresence mode="popLayout">
-            {filteredReports?.map((report) => (
+            {paginatedReports?.map((report) => (
               <motion.div
                 key={report.id}
                 layout
@@ -506,6 +514,16 @@ export default function FieldServiceReports() {
             ))}
           </AnimatePresence>
         </div>
+      )}
+
+      {!isLoading && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredReports?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       )}
 
       {(selectedSchedule || isFormOpen || editingReport) && (

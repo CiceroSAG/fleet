@@ -6,6 +6,7 @@ import FuelLogForm from '@/components/FuelLogForm';
 import ConfirmModal from '@/components/ConfirmModal';
 import { useAuth } from '@/lib/auth';
 import { getCurrencySymbol } from '@/lib/utils';
+import Pagination from '@/components/Pagination';
 
 export default function FuelLogs() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -14,6 +15,8 @@ export default function FuelLogs() {
   const [dateFilter, setDateFilter] = useState('');
   const [equipmentFilter, setEquipmentFilter] = useState('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -69,6 +72,11 @@ export default function FuelLogs() {
     
     return matchesSearch && matchesDate && matchesEquipment;
   });
+
+  const paginatedLogs = filteredLogs?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Calculate summary statistics
   const stats = React.useMemo(() => {
@@ -168,7 +176,7 @@ export default function FuelLogs() {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 className="block w-full rounded-md border-gray-300 pl-10 focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 border"
                 placeholder="Search by asset tag..."
               />
@@ -179,12 +187,12 @@ export default function FuelLogs() {
               <input
                 type="month"
                 value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
                 className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
               />
               <select
                 value={equipmentFilter}
-                onChange={(e) => setEquipmentFilter(e.target.value)}
+                onChange={(e) => { setEquipmentFilter(e.target.value); setCurrentPage(1); }}
                 className="block w-full sm:w-auto rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-orange-500 focus:outline-none focus:ring-orange-500 sm:text-sm border"
               >
                 <option key="all" value="all">All Equipment</option>
@@ -225,7 +233,7 @@ export default function FuelLogs() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {filteredLogs.map((item: any) => (
+                {paginatedLogs.map((item: any) => (
                   <tr key={item.id}>
                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
                       {new Date(item.date).toLocaleString()}
@@ -260,6 +268,14 @@ export default function FuelLogs() {
             </table>
           </div>
         )}
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredLogs?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       </div>
 
       {isFormOpen && (

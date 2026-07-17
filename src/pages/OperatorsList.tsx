@@ -4,10 +4,13 @@ import { getOperators, deleteOperator } from '../lib/api';
 import { Plus, Search, User, Mail, Phone, MoreVertical, ShieldCheck, Clock, Edit2, Trash2 } from 'lucide-react';
 import OperatorForm from '../components/OperatorForm';
 import ConfirmModal from '../components/ConfirmModal';
+import Pagination from '../components/Pagination';
 
 export default function OperatorsList() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOperator, setSelectedOperator] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -29,6 +32,11 @@ export default function OperatorsList() {
   const filteredOperators = operators?.filter(op => 
     op.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     op.license_number.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedOperators = filteredOperators?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   const handleEdit = (op: any) => {
@@ -76,7 +84,7 @@ export default function OperatorsList() {
             type="text"
             placeholder="Search by name or license..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
           />
         </div>
@@ -84,7 +92,7 @@ export default function OperatorsList() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredOperators?.map((operator) => (
+        {paginatedOperators?.map((operator) => (
           <div key={operator.id} className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
             <div className="p-6">
               <div className="flex items-start justify-between mb-4">
@@ -160,6 +168,15 @@ export default function OperatorsList() {
           </div>
         )}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredOperators?.length || 0}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={setItemsPerPage}
+      />
+
       {isFormOpen && (
         <OperatorForm
           operator={selectedOperator}

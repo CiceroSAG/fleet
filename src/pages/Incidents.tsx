@@ -4,10 +4,13 @@ import { getIncidents, getEquipment, getOperators, deleteIncident } from '../lib
 import { Plus, Search, AlertTriangle, ShieldAlert, Calendar, User, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import IncidentForm from '../components/IncidentForm';
 import ConfirmModal from '../components/ConfirmModal';
+import Pagination from '../components/Pagination';
 
 export default function Incidents() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -42,6 +45,11 @@ export default function Incidents() {
     const searchStr = `${equip?.asset_tag} ${op?.name} ${incident.type} ${incident.description}`.toLowerCase();
     return searchStr.includes(searchTerm.toLowerCase());
   });
+
+  const paginatedIncidents = filteredIncidents?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const handleEdit = (incident: any) => {
     setSelectedIncident(incident);
@@ -88,7 +96,7 @@ export default function Incidents() {
             type="text"
             placeholder="Search by equipment, operator or type..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
           />
         </div>
@@ -96,7 +104,7 @@ export default function Incidents() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredIncidents?.map((incident) => {
+        {paginatedIncidents?.map((incident) => {
           const equip = equipment?.find(e => e.id === incident.equipment_id);
           const op = operators?.find(o => o.id === incident.operator_id);
           
@@ -185,6 +193,15 @@ export default function Incidents() {
           </div>
         )}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredIncidents?.length || 0}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={setItemsPerPage}
+      />
+
       {isFormOpen && (
         <IncidentForm
           incident={selectedIncident}

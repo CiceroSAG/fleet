@@ -4,12 +4,15 @@ import { getInspections, getInspectionChecklists, createInspection, getEquipment
 import { ClipboardCheck, Plus, Search, Calendar, CheckCircle2, AlertCircle, ChevronRight, X, Clock, Truck, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth';
+import Pagination from '../components/Pagination';
 
 export default function Inspections() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { data: inspections, isLoading: loadingInspections } = useQuery({
     queryKey: ['inspections'],
@@ -52,6 +55,11 @@ export default function Inspections() {
   const filteredInspections = inspections?.filter((ins: any) => 
     ins.equipment?.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ins.inspection_checklists?.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedInspections = filteredInspections?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   const selectedChecklist = checklists?.find((c: any) => c.id === formData.checklist_id);
@@ -128,7 +136,7 @@ export default function Inspections() {
               type="text"
               placeholder="Search by asset tag or checklist..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
             />
           </div>
@@ -146,7 +154,7 @@ export default function Inspections() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredInspections?.map((ins: any) => (
+              {paginatedInspections?.map((ins: any) => (
                 <tr key={ins.id} className="group hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-2">
                     <div className="flex items-center space-x-3">
@@ -200,6 +208,14 @@ export default function Inspections() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredInspections?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       </div>
 
       {/* New Inspection Modal */}

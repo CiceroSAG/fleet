@@ -5,6 +5,7 @@ import { Plus, Search, User, Mail, Briefcase, CheckCircle2, XCircle, MoreVertica
 import { motion, AnimatePresence } from 'motion/react';
 import ConfirmModal from '../components/ConfirmModal';
 import { useAuth } from '../lib/auth';
+import Pagination from '../components/Pagination';
 
 export default function Technicians() {
   const { profile } = useAuth();
@@ -26,6 +27,8 @@ export default function Technicians() {
     );
   }
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
   const [selectedTechnician, setSelectedTechnician] = useState<any>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -80,6 +83,11 @@ export default function Technicians() {
     tech.specialty?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const paginatedTechnicians = filteredTechnicians?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const handleEdit = (tech: any) => {
     setSelectedTechnician(tech);
     setIsFormOpen(true);
@@ -125,7 +133,7 @@ export default function Technicians() {
             type="text"
             placeholder="Search by name or specialty..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
           />
         </div>
@@ -133,7 +141,7 @@ export default function Technicians() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTechnicians?.map((tech) => (
+        {paginatedTechnicians?.map((tech) => (
           <div key={tech.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group">
             <div className="absolute right-4 top-4">
               <div className="relative">
@@ -208,6 +216,16 @@ export default function Technicians() {
           </div>
         )}
       </div>
+
+      {!isLoading && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredTechnicians?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
+      )}
 
       {/* Form Modal */}
       <AnimatePresence>

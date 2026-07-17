@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import MaintenanceScheduleForm from '@/components/MaintenanceScheduleForm';
 import MaintenanceForm from '@/components/MaintenanceForm';
 import RepairLogForm from '@/components/RepairLogForm';
+import Pagination from '@/components/Pagination';
 
 interface MaintenanceSchedule {
   id: string;
@@ -39,6 +40,8 @@ interface MaintenanceSchedule {
 export default function MaintenanceScheduling() {
   const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filter, setFilter] = useState({
     status: 'all',
     priority: 'all',
@@ -56,6 +59,7 @@ export default function MaintenanceScheduling() {
   });
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchMaintenanceSchedules();
   }, [filter]);
 
@@ -78,6 +82,11 @@ export default function MaintenanceScheduling() {
       fetchMaintenanceSchedules();
     }
   });
+
+  const paginatedSchedules = schedules.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const partsCheckMutation = useMutation({
     mutationFn: checkPartsAvailability,
@@ -416,7 +425,7 @@ export default function MaintenanceScheduling() {
             {schedules.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No maintenance schedules found.</p>
             ) : (
-              schedules.map((schedule) => (
+              paginatedSchedules.map((schedule) => (
                 <div key={schedule.id} className="border rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-3">
@@ -550,6 +559,18 @@ export default function MaintenanceScheduling() {
               ))
             )}
           </div>
+          
+          {schedules.length > 0 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalItems={schedules.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+              />
+            </div>
+          )}
         </div>
       </div>
       <AnimatePresence>

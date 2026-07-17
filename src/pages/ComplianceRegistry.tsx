@@ -1,15 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getComplianceAlerts } from '../lib/api';
 import { ShieldCheck, AlertTriangle, Clock, Truck, FileText } from 'lucide-react';
 import { motion } from 'motion/react';
 import { format, differenceInDays } from 'date-fns';
+import Pagination from '../components/Pagination';
 
 export default function ComplianceAlerts() {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
+
   const { data: alerts, isLoading } = useQuery({ 
     queryKey: ['complianceAlerts'], 
     queryFn: getComplianceAlerts 
   });
+
+  const paginatedAlerts = alerts?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const getStatus = (expiryDate: string) => {
     const days = differenceInDays(new Date(expiryDate), new Date());
@@ -29,7 +38,7 @@ export default function ComplianceAlerts() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {alerts?.map((alert: any) => {
+        {paginatedAlerts?.map((alert: any) => {
           const status = getStatus(alert.expiry_date);
           return (
             <motion.div
@@ -80,6 +89,16 @@ export default function ComplianceAlerts() {
           </div>
         )}
       </div>
+
+      {!isLoading && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={alerts?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
+      )}
     </div>
   );
 }

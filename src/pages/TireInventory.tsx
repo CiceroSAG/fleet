@@ -4,6 +4,7 @@ import { getTires, logTireAction, getEquipment } from '../lib/api';
 import { Circle, Settings, History, Plus, X, Truck, AlertCircle, Ruler, Gauge } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import Pagination from '../components/Pagination';
 
 export default function TireInventory() {
   const { t } = useTranslation();
@@ -11,6 +12,8 @@ export default function TireInventory() {
   const { data: tires, isLoading } = useQuery({ queryKey: ['tires'], queryFn: () => getTires() });
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: getEquipment });
   
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedTire, setSelectedTire] = useState<any>(null);
   const [showLogModal, setShowLogModal] = useState(false);
   const [logForm, setLogForm] = useState({
@@ -19,6 +22,11 @@ export default function TireInventory() {
     pressure: '',
     notes: ''
   });
+
+  const paginatedTires = tires?.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const logMutation = useMutation({
     mutationFn: logTireAction,
@@ -69,7 +77,7 @@ export default function TireInventory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 font-sans">
-                {tires?.map((tire: any) => (
+                {paginatedTires?.map((tire: any) => (
                   <tr 
                     key={tire.id} 
                     className="hover:bg-gray-50/50 cursor-pointer transition-all"
@@ -117,6 +125,14 @@ export default function TireInventory() {
                 ))}
               </tbody>
             </table>
+
+            <Pagination
+              currentPage={currentPage}
+              totalItems={tires?.length || 0}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           </div>
         </div>
 
